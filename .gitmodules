@@ -1,0 +1,3 @@
+[submodule "waveglow"]
+	path = waveglow
+	url = git@github.com:jannikwagner/waveglow.git
