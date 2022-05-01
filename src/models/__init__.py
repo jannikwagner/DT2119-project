@@ -25,5 +25,5 @@
  #####################################################################################
 
 import os
-import sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+LOG_PATH = os.path.abspath(os.path.dirname(__file__) + os.sep + '..' + os.sep + '..' + os.sep + 'log')

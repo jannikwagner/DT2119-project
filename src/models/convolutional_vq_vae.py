@@ -41,6 +41,10 @@ class ConvolutionalVQVAE(nn.Module):
     def __init__(self, configuration, device):
         super(ConvolutionalVQVAE, self).__init__()
 
+        print()
+        print(configuration)
+        print()
+
         self._output_features_filters = configuration['output_features_filters'] * 3 if configuration['augment_output_features'] else configuration['output_features_filters']
         self._output_features_dim = configuration['output_features_dim']
         self._verbose = configuration['verbose']
