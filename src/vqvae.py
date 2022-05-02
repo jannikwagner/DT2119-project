@@ -16,9 +16,10 @@ def load_configuration(path):
 
 config = load_configuration(default_configuration_path)
 
-print(config)
+#print(config)
 
 device_config = DeviceConfiguration.load_from_configuration(config)
 model = ConvolutionalVQVAE(config, device_config.device).to(device_config.device)
 
-print(model)
+#print(model)
+

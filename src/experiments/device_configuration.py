@@ -53,37 +53,24 @@ class DeviceConfiguration(object):
     def use_data_parallel(self):
         return self._use_data_parallel
 
-    # @staticmethod
-    # def load_from_configuration(configuration):
-    #     use_cuda = configuration['use_cuda'] and torch.cuda.is_available() # Use cuda if specified and available
-    #     default_device = 'cuda' if use_cuda else 'cpu' # Use default cuda device if possible or use the cpu
-    #     device = configuration['use_device'] if configuration['use_device'] is not None else default_device # Use a defined device if specified
-    #     gpu_ids = [i for i in range(torch.cuda.device_count())] if configuration['use_data_parallel'] else [0] # Resolve the gpu ids if gpu parallelization is specified
-    #     if configuration['use_device'] and ':' in configuration['use_device']:
-    #         gpu_ids = [int(configuration['use_device'].split(':')[1])]
-
-    #     use_data_parallel = True if configuration['use_data_parallel'] and use_cuda and len(gpu_ids) > 1 else False
-
-    #     ConsoleLogger.status('The used device is: {}'.format(device))
-    #     ConsoleLogger.status('The gpu ids are: {}'.format(gpu_ids))
-
-    #     # Sanity checks
-    #     if not use_cuda and configuration['use_cuda']:
-    #         ConsoleLogger.warn("The configuration file specified use_cuda=True but cuda isn't available")
-    #     if configuration['use_data_parallel'] and len(gpu_ids) < 2:
-    #         ConsoleLogger.warn('The configuration file specified use_data_parallel=True but there is only {} GPU available'.format(len(gpu_ids)))
-
-    #     return DeviceConfiguration(use_cuda, device, gpu_ids, use_data_parallel)
-
     @staticmethod
     def load_from_configuration(configuration):
-        use_cuda =  torch.cuda.is_available() # Use cuda if specified and available
+        use_cuda = configuration['use_cuda'] and torch.cuda.is_available() # Use cuda if specified and available
         default_device = 'cuda' if use_cuda else 'cpu' # Use default cuda device if possible or use the cpu
-        device = default_device # Use a defined device if specified
-        gpu_ids = [0] # Resolve the gpu ids if gpu parallelization is specified
-        use_data_parallel = False
+        device = configuration['use_device'] if configuration['use_device'] is not None else default_device # Use a defined device if specified
+        gpu_ids = [i for i in range(torch.cuda.device_count())] if configuration['use_data_parallel'] else [0] # Resolve the gpu ids if gpu parallelization is specified
+        if configuration['use_device'] and ':' in configuration['use_device']:
+            gpu_ids = [int(configuration['use_device'].split(':')[1])]
+
+        use_data_parallel = True if configuration['use_data_parallel'] and use_cuda and len(gpu_ids) > 1 else False
 
         ConsoleLogger.status('The used device is: {}'.format(device))
         ConsoleLogger.status('The gpu ids are: {}'.format(gpu_ids))
-        
+
+        # Sanity checks
+        if not use_cuda and configuration['use_cuda']:
+            ConsoleLogger.warn("The configuration file specified use_cuda=True but cuda isn't available")
+        if configuration['use_data_parallel'] and len(gpu_ids) < 2:
+            ConsoleLogger.warn('The configuration file specified use_data_parallel=True but there is only {} GPU available'.format(len(gpu_ids)))
+
         return DeviceConfiguration(use_cuda, device, gpu_ids, use_data_parallel)
