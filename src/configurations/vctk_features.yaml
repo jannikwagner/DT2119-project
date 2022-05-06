@@ -2,6 +2,12 @@ decoder_type: 'deconvolutional'
 trainer_type: 'convolutional'
 verbose: False
 
+val_split: 0.2
+test_split: 0.2
+audio_length: 16000
+epochs: 10
+num_classes: 35
+
 # Training
 batch_size: 1 # batch_size per a GPU
 data_root: './' # ./ == vctk/raw/VCTK-Corpus

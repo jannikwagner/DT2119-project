@@ -119,7 +119,8 @@ class ConvolutionalVQVAE(nn.Module):
         return self._decoder
 
     def forward(self, x, speaker_dic, speaker_id):
-        x = x.permute(0, 2, 1).contiguous().float()
+        print(x.shape)
+        # x = x.permute(0, 2, 1).contiguous().float()
 
         z = self._encoder(x)
         if self._verbose:
