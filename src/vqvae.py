@@ -4,15 +4,12 @@ import yaml
 import pickle
 import torch
 import matplotlib as plt
-import IPython.display as ipd
 from tqdm import tqdm
-from dataset import speechcommands_file_reader
 from error_handling.console_logger import ConsoleLogger
 from models.convolutional_vq_vae import ConvolutionalVQVAE
 from experiments.device_configuration import DeviceConfiguration
 from torchaudio.datasets import SPEECHCOMMANDS
-from sklearn.decomposition import PCA
-from dataset import *
+import torchaudio
 
 DATA_DOWNLOAD_PATH = "../data/sc/"
 DATA_PATH = "../data/sc/SpeechCommands/speech_commands_v0.02"
@@ -75,16 +72,6 @@ print("waveforms loaded")
 
 labels = sorted(list(set(datapoint[2] for datapoint in train_set)))
 print("labels loaded")
-
-# waveform_first, *_ = train_set[0]
-# ipd.Audio(waveform_first.numpy(), rate=sample_rate)
-
-# waveform_second, *_ = train_set[1]
-# ipd.Audio(waveform_second.numpy(), rate=sample_rate)
-
-# waveform_last, *_ = train_set[-1]
-# ipd.Audio(waveform_last.numpy(), rate=sample_rate)
-
 
 def make_speaker_dic(data_set):
     speakers = [speaker_id for _, _, _, speaker_id, _ in data_set]
@@ -276,18 +263,15 @@ def predict(tensor):
 
 
 waveform, sample_rate, utterance, *_ = train_set[-1]
-ipd.Audio(waveform.numpy(), rate=sample_rate)
 
 print(f"Expected: {utterance}. Predicted: {predict(waveform)}.")
 
 for i, (waveform, sample_rate, utterance, *_) in enumerate(test_set):
     output = predict(waveform)
     if output != utterance:
-        ipd.Audio(waveform.numpy(), rate=sample_rate)
         print(f"Data point #{i}. Expected: {utterance}. Predicted: {output}.")
         break
 else:
     print("All examples in this dataset were correctly classified!")
     print("In this case, let's just look at the last data point")
-    ipd.Audio(waveform.numpy(), rate=sample_rate)
     print(f"Data point #{i}. Expected: {utterance}. Predicted: {output}.")
