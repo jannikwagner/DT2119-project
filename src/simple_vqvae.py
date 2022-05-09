@@ -30,7 +30,8 @@ def load_configuration(path):
 CONFIG = load_configuration(default_configuration_path)
 DEVICE_CONFIG = DeviceConfiguration.load_from_configuration(CONFIG)
 
-#print(CONFIG)
+should_repickle = False
+should_train_model = False
 
 ##############################################
 # LOADING THE DATA
@@ -56,7 +57,7 @@ class SubsetSC(SPEECHCOMMANDS):
 
 
 # Create training and testing split of the data. We do not use validation.
-train_set = SubsetSC("training", num=100)
+train_set = SubsetSC("training")
 print("trainset length", train_set)
 test_set = SubsetSC("testing")
 print("SubsetSC loaded")
@@ -64,12 +65,15 @@ print("SubsetSC loaded")
 waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
 print("waveforms loaded")
 
-labels = sorted(list(set(datapoint[2] for datapoint in train_set)))
-with open(PICKLE_DICT+'labels.pickle', 'wb') as handle:
-    pickle.dump(labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
-with open(PICKLE_DICT+'labels.pickle', 'rb') as handle:
-    labels = pickle.load(handle)
-print("labels loaded")
+if should_repickle:
+    labels = sorted(list(set(datapoint[2] for datapoint in train_set)))
+    with open(PICKLE_DICT+'labels.pickle', 'wb') as handle:
+        pickle.dump(labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    print("labels saved")  
+else:
+    with open(PICKLE_DICT+'labels.pickle', 'rb') as handle:
+        labels = pickle.load(handle)
+    print("labels loaded")
 
 def make_speaker_dic(data_set):
     speakers = [speaker_id for _, _, _, speaker_id, _ in data_set]
@@ -78,12 +82,15 @@ def make_speaker_dic(data_set):
     speaker_dic = {speaker: i for i, speaker in enumerate(speakers)}
     return speaker_dic
 
-speaker_dic = make_speaker_dic(train_set)
-with open(PICKLE_DICT+'speaker_dict.pickle', 'wb') as handle:
-    pickle.dump(speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
-with open(PICKLE_DICT+'speaker_dict.pickle', 'rb') as handle:
-    speaker_dic = pickle.load(handle)
-print("speaker dictionary loaded")
+if should_repickle: 
+    speaker_dic = make_speaker_dic(train_set)
+    with open(PICKLE_DICT+'speaker_dict.pickle', 'wb') as handle:
+        pickle.dump(speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    print("speaker_dic saved")  
+else:
+    with open(PICKLE_DICT+'speaker_dict.pickle', 'rb') as handle:
+        speaker_dic = pickle.load(handle)
+    print("speaker dictionary loaded")
 
 ##############################################
 # FORMATTING THE DATA
@@ -103,6 +110,7 @@ def label_to_index(word):
 def index_to_label(index):
     # Return the word corresponding to the index in labels
     # This is the inverse of label_to_index
+    print("index", index)
     return labels[index]
 
 def pad_sequence(batch):
@@ -228,11 +236,12 @@ class VariationalAutoencoder(nn.Module):
 ##############################################
 # CREATE MODEL
 ###############################################
-model = VariationalAutoencoder(data_dim, 128).to(DEVICE_CONFIG.device)
 
-#print(model)
 MODEL_PATH = PICKLE_DICT+'simple_vq_vae_model.pickle'
-torch.save(model, MODEL_PATH)
+if should_repickle:
+    model = VariationalAutoencoder(data_dim, 128).to(DEVICE_CONFIG.device)
+    torch.save(model, MODEL_PATH)
+    print("model saved")
 model = torch.load(MODEL_PATH)
 print("model loaded")
 
@@ -314,6 +323,7 @@ def number_of_correct(pred, target):
 
 def get_likely_index(tensor):
     # find most likely label index for each element in the batch
+    print("tensor", tensor)
     return tensor.argmax(dim=-1)
 
 
@@ -321,13 +331,11 @@ def test(model, epoch):
     model.eval()
     correct = 0
     for data, target, speaker_id in test_loader:
-        print(data.shape)
         data = data.to(DEVICE_CONFIG.device)
         target = target.to(DEVICE_CONFIG.device)
 
         # apply transform and model on whole batch directly on device
         data = transform(data)
-        print(data.shape)
         output = model(data, speaker_dic, speaker_id)
 
         pred = get_likely_index(output)
@@ -342,38 +350,73 @@ n_epoch = CONFIG['epochs']
 loss_over_epochs = []
 
 # The transform needs to live on the same device as the model and the data.
-transform = transform.to(DEVICE_CONFIG.device)
-for epoch in tqdm(range(1, n_epoch + 1)):
-    loss = train_one_epoch(model, train_loader, optimizer, DEVICE_CONFIG.device)
-    loss_over_epochs.append(loss)
-    # test(model, epoch)
-    scheduler.step()
+if should_train_model:
+    transform = transform.to(DEVICE_CONFIG.device)
+    for epoch in tqdm(range(1, n_epoch + 1)):
+        loss = train_one_epoch(model, train_loader, optimizer, DEVICE_CONFIG.device)
+        loss_over_epochs.append(loss)
+        # test(model, epoch)
+        scheduler.step()
 
-TRAINED_MODEL_PATH = PICKLE_DICT+'trained_simple_vq_vae_model.pickle'
-torch.save(model, TRAINED_MODEL_PATH)
+
+TRAINED_MODEL_PATH = PICKLE_DICT+'trained_simple_vq_vae_model_' + str(n_epoch) + 'epochs.pickle'
+if should_repickle:
+    torch.save(model, TRAINED_MODEL_PATH)
 model = torch.load(TRAINED_MODEL_PATH)
 print("trained model loaded")
 
-def predict(tensor):
-    # Use the model to predict the label of the waveform
-    tensor = tensor.to(DEVICE_CONFIG.device)
-    tensor = transform(tensor)
-    tensor = model(tensor.unsqueeze(0))
-    tensor = get_likely_index(tensor)
-    tensor = index_to_label(tensor.squeeze())
-    return tensor
 
 
-waveform, sample_rate, utterance, *_ = train_set[-1]
 
-print(f"Expected: {utterance}. Predicted: {predict(waveform)}.")
 
-for i, (waveform, sample_rate, utterance, *_) in enumerate(test_set):
-    output = predict(waveform)
-    if output != utterance:
-        print(f"Data point #{i}. Expected: {utterance}. Predicted: {output}.")
-        break
-else:
-    print("All examples in this dataset were correctly classified!")
-    print("In this case, let's just look at the last data point")
-    print(f"Data point #{i}. Expected: {utterance}. Predicted: {output}.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def predict(tensor):
+#     # Use the model to predict the label of the waveform
+#     tensor = tensor.to(DEVICE_CONFIG.device)
+#     tensor = transform(tensor)
+#     output = model(tensor.unsqueeze(0))
+#     tensor, *_  = output
+#     tensor = get_likely_index(tensor)
+#     tensor = index_to_label(tensor.squeeze())
+#     return tensor
+
+
+# waveform, sample_rate, utterance, *_ = train_set[-1]
+# print("type1", waveform.type())
+
+# print(f"Expected: {utterance}. Predicted: {predict(waveform)}.")
+
+# for i, (waveform, sample_rate, utterance, *_) in enumerate(test_set):
+#     output = predict(waveform)
+#     if output != utterance:
+#         print(f"Data point #{i}. Expected: {utterance}. Predicted: {output}.")
+#         break
+# else:
+#     print("All examples in this dataset were correctly classified!")
+#     print("In this case, let's just look at the last data point")
+#     print(f"Data point #{i}. Expected: {utterance}. Predicted: {output}.")
