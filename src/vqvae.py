@@ -44,7 +44,7 @@ print("model loaded")
 # LOADING THE DATA
 ###############################################
 class SubsetSC(SPEECHCOMMANDS):
-    def __init__(self, subset: str = None):
+    def __init__(self, subset: str = None, num: int = -1):
         super().__init__(DATA_DOWNLOAD_PATH, download=True)
 
         def load_list(filename):
@@ -60,10 +60,12 @@ class SubsetSC(SPEECHCOMMANDS):
             excludes = load_list("validation_list.txt") + load_list("testing_list.txt")
             excludes = set(excludes)
             self._walker = [w for w in self._walker if w not in excludes]
+            self._walker = self._walker[:num]
 
 
-# Create training and testing split of the data. We do not use validation in this tutorial.
-train_set = SubsetSC("training")
+# Create training and testing split of the data. We do not use validation.
+train_set = SubsetSC("training", num=100)
+print("trainset length", train_set)
 test_set = SubsetSC("testing")
 print("SubsetSC loaded")
 
@@ -71,6 +73,10 @@ waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
 print("waveforms loaded")
 
 labels = sorted(list(set(datapoint[2] for datapoint in train_set)))
+with open(PICKLE_DICT+'labels.pickle', 'wb') as handle:
+    pickle.dump(labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
+with open(PICKLE_DICT+'labels.pickle', 'rb') as handle:
+    labels = pickle.load(handle)
 print("labels loaded")
 
 def make_speaker_dic(data_set):
@@ -80,9 +86,9 @@ def make_speaker_dic(data_set):
     speaker_dic = {speaker: i for i, speaker in enumerate(speakers)}
     return speaker_dic
 
-# speaker_dic = make_speaker_dic(train_set)
-# with open(PICKLE_DICT+'speaker_dict.pickle', 'wb') as handle:
-#     pickle.dump(speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
+speaker_dic = make_speaker_dic(train_set)
+with open(PICKLE_DICT+'speaker_dict.pickle', 'wb') as handle:
+    pickle.dump(speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
 with open(PICKLE_DICT+'speaker_dict.pickle', 'rb') as handle:
     speaker_dic = pickle.load(handle)
 print("speaker dictionary loaded")
@@ -91,8 +97,9 @@ print("speaker dictionary loaded")
 ##############################################
 # FORMATTING THE DATA
 ###############################################
-n_mels=64
 transform = torchaudio.transforms.MelSpectrogram(sample_rate=16000, n_mels=39)
+# new_sample_rate = 8000
+# transform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=new_sample_rate)
 
 def label_to_index(word):
     # Return the position of the word in labels

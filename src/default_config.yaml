@@ -1,0 +1,4 @@
+# Cuda
+use_cuda: True
+use_data_parallel: False
+use_device: 
