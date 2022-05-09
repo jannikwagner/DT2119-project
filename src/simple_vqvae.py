@@ -218,7 +218,7 @@ class VariationalAutoencoder(nn.Module):
         self.data_dim = data_dim
         self.data_dim_flat = torch.prod(torch.as_tensor(data_dim))
         self.encoder = VariationalEncoder(data_dim, latent_dim)
-        self.decoder = Decoder(latent_dim, data_dim)
+        self.decoder = Decoder(data_dim, latent_dim)
 
     def forward(self, x):
         z, kl = self.encoder(x)
@@ -228,7 +228,7 @@ class VariationalAutoencoder(nn.Module):
 ##############################################
 # CREATE MODEL
 ###############################################
-model = VariationalEncoder(data_dim, 1024).to(DEVICE_CONFIG.device)
+model = VariationalAutoencoder(data_dim, 128).to(DEVICE_CONFIG.device)
 
 #print(model)
 MODEL_PATH = PICKLE_DICT+'simple_vq_vae_model.pickle'
@@ -247,7 +247,7 @@ def train_one_epoch(model, dataloader, optimizer, device):
     total_loss = 0
 
     for batch_idx, (audio, label, speaker_id) in enumerate(dataloader):
-        
+        print(batch_idx)
         audio = audio.to(device)  # batch_size, n_channels, n_samples
         label = label.to(device)
         speaker_id = speaker_id.to(device)
