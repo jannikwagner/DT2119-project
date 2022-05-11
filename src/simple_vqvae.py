@@ -98,12 +98,43 @@ else:
 waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
 print(waveform.min(), waveform.max())
 n_mels = 80
+mel_scale = "htk"
+n_fft = 400
+hop_length = 256
+win_length = 400
+n_stft = n_fft // 2 + 1
 # how to use librosa mel filter defaults?
-transform = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=n_mels, mel_scale="htk", n_fft=1024, hop_length=256, win_length=1024, )
-transformed = transform(waveform)
-print(transformed[0].shape)
-torch.save(transformed[0], "test.pth")
-data_dim = transformed.shape
+transform_SpectrogramComplex = torchaudio.transforms.Spectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length, power=None)
+transform_Spectrogram = torchaudio.transforms.Spectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length)
+transform_InverseSpectrogram = torchaudio.transforms.InverseSpectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length)
+transform_GriffinLim = torchaudio.transforms.GriffinLim(n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+
+transform_MelScale = torchaudio.transforms.MelScale(n_mels=n_mels, sample_rate=sample_rate, mel_scale=mel_scale, n_stft=n_stft)
+transform_InverseMelScale = torchaudio.transforms.InverseMelScale(n_mels=n_mels, sample_rate=sample_rate, mel_scale=mel_scale, n_stft=n_stft)
+transform_MelSpectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=n_mels, mel_scale=mel_scale, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+
+spectrogram = transform_Spectrogram(waveform)
+print("spectrogram shape:", spectrogram.shape)
+spectrogram_complex = transform_SpectrogramComplex(waveform)
+print("spectrogram_complex shape:", spectrogram_complex.shape)
+mel_spectrogram = transform_MelSpectrogram(waveform)
+print("mel_spectrogram shape:", mel_spectrogram.shape)
+mel_spectrogram2 = transform_MelScale(spectrogram)
+print("mel_spectrogram2 shape:", mel_spectrogram2.shape)
+reconstructed_spectrogram = transform_InverseMelScale(mel_spectrogram)
+print("reconstructed_spectrogram shape:", reconstructed_spectrogram.shape)
+reconstructed_spectrogram2 = transform_InverseMelScale(mel_spectrogram2)
+print("reconstructed_spectrogram2 shape:", reconstructed_spectrogram2.shape)
+reconstructed = transform_GriffinLim(spectrogram)
+print("reconstructed shape:", reconstructed.shape)
+reconstructed2 = transform_InverseSpectrogram(spectrogram_complex)
+print("reconstructed2 shape:", reconstructed2.shape)
+reconstructed3 = transform_GriffinLim(reconstructed_spectrogram)
+print("reconstructed3 shape:", reconstructed3.shape)
+torchaudio.save("reconstructed.wav", reconstructed, sample_rate)
+torchaudio.save("reconstructed2.wav", reconstructed2, sample_rate)
+torchaudio.save("original.wav", waveform, sample_rate)
+data_dim = mel_spectrogram.shape
 # new_sample_rate = 8000
 # transform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=new_sample_rate)
 
@@ -306,7 +337,7 @@ def test(model, epoch):
         target = target.to(DEVICE_CONFIG.device)
 
         # apply transform and model on whole batch directly on device
-        data = transform(data)
+        data = transform_MelSpectrogram(data)
         output = model(data, speaker_dic, speaker_id)
 
         pred = get_likely_index(output)
@@ -322,9 +353,9 @@ loss_over_epochs = []
 
 # The transform needs to live on the same device as the model and the data.
 if should_train_model:
-    transform = transform.to(DEVICE_CONFIG.device)
+    transform_MelSpectrogram = transform_MelSpectrogram.to(DEVICE_CONFIG.device)
     for epoch in tqdm(range(1, n_epoch + 1)):
-        loss = train_one_epoch(model, train_loader, optimizer, transform, DEVICE_CONFIG.device)
+        loss = train_one_epoch(model, train_loader, optimizer, transform_MelSpectrogram, DEVICE_CONFIG.device)
         loss_over_epochs.append(loss)
         # test(model, epoch)
         scheduler.step()
