@@ -96,8 +96,13 @@ else:
 # FORMATTING THE DATA
 ###############################################
 waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
-transform = torchaudio.transforms.MelSpectrogram(sample_rate=16000, n_mels=39)
+print(waveform.min(), waveform.max())
+n_mels = 80
+# how to use librosa mel filter defaults?
+transform = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=n_mels, mel_scale="htk", n_fft=1024, hop_length=256, win_length=1024, )
 transformed = transform(waveform)
+print(transformed[0].shape)
+torch.save(transformed[0], "test.pth")
 data_dim = transformed.shape
 # new_sample_rate = 8000
 # transform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=new_sample_rate)
@@ -250,7 +255,7 @@ print("model loaded")
 # TRAINING
 ##############################################
 import time
-def train_one_epoch(model, dataloader, optimizer, device):
+def train_one_epoch(model, dataloader, optimizer, transform, device):
     model.train()
     t = time.time()
     total_loss = 0
@@ -281,40 +286,6 @@ def train_one_epoch(model, dataloader, optimizer, device):
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)  # reduce the learning after 20 epochs by a factor of 10
 
-def train(model, epoch, log_interval):
-    model.train()
-    for batch_idx, (data, target, speaker_id) in enumerate(train_loader):
-        device = DEVICE_CONFIG.device
-        data = data.to(device)
-        target = target.to(device)
-        speaker_id = target.to(speaker_id)
-        print(data.shape, target.shape, speaker_id.shape)
-
-        # apply transform and model on whole batch directly on device
-        data = transform(data)
-        print(data.shape)
-        data = data[:, 0, ...]
-        print(data.shape)
-        output = model(data, speaker_dic, speaker_id)
-        reconstructed_x, vq_loss, losses, perplexity, encoding_indices, concatenated_quantized = output
-        loss = losses['e_latent_loss']
-        print("loss", loss)
-
-        # negative log-likelihood for a tensor of size (batch x 1 x n_output)
-        #print("recons", reconstructed_x.shape, reconstructed_x.squeeze().shape, target.shape)
-        #loss = F.nll_loss(reconstructed_x.squeeze(), target)
-
-        optimizer.zero_grad()
-        #loss.backward()
-        optimizer.step()
-
-        # print training stats
-        if batch_idx % log_interval == 0:
-            print(f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} ({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss:.6f}")
-
-        # update progress bar
-        # record loss
-        #losses.append(loss.item())
 
 def number_of_correct(pred, target):
     # count number of correct predictions
@@ -353,7 +324,7 @@ loss_over_epochs = []
 if should_train_model:
     transform = transform.to(DEVICE_CONFIG.device)
     for epoch in tqdm(range(1, n_epoch + 1)):
-        loss = train_one_epoch(model, train_loader, optimizer, DEVICE_CONFIG.device)
+        loss = train_one_epoch(model, train_loader, optimizer, transform, DEVICE_CONFIG.device)
         loss_over_epochs.append(loss)
         # test(model, epoch)
         scheduler.step()
