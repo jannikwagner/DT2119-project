@@ -1,5 +1,6 @@
 from distutils.command.config import config
 import os
+from wave import Wave_read
 from pkg_resources import DEVELOP_DIST
 import yaml
 import pickle
@@ -16,6 +17,7 @@ import time
 DATA_DOWNLOAD_PATH = "../data/sc/"
 DATA_PATH = "../data/sc/SpeechCommands/speech_commands_v0.02"
 PICKLE_DICT = "../simple_pickles/"
+AUDIO_PATH = "../audio/"
 
 os.makedirs(DATA_DOWNLOAD_PATH, exist_ok=True)
 
@@ -103,14 +105,21 @@ n_fft = 400
 hop_length = 256
 win_length = 400
 n_stft = n_fft // 2 + 1
+
+n_mels = 39
+mel_scale = "htk"
+n_fft = 400
+hop_length = None
+win_length = None
+n_stft = n_fft // 2 + 1
 # how to use librosa mel filter defaults?
-transform_SpectrogramComplex = torchaudio.transforms.Spectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length, power=None)
+transform_SpectrogramComplex = torchaudio.transforms.Spectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length, power=None)  # hard to use in nn
 transform_Spectrogram = torchaudio.transforms.Spectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length)
-transform_InverseSpectrogram = torchaudio.transforms.InverseSpectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length)
-transform_GriffinLim = torchaudio.transforms.GriffinLim(n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+transform_InverseSpectrogram = torchaudio.transforms.InverseSpectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length)  # need complex
+transform_GriffinLim = torchaudio.transforms.GriffinLim(n_fft=n_fft, hop_length=hop_length, win_length=win_length)  # does not sound too good
 
 transform_MelScale = torchaudio.transforms.MelScale(n_mels=n_mels, sample_rate=sample_rate, mel_scale=mel_scale, n_stft=n_stft)
-transform_InverseMelScale = torchaudio.transforms.InverseMelScale(n_mels=n_mels, sample_rate=sample_rate, mel_scale=mel_scale, n_stft=n_stft)
+transform_InverseMelScale = torchaudio.transforms.InverseMelScale(n_mels=n_mels, sample_rate=sample_rate, mel_scale=mel_scale, n_stft=n_stft)  # takes some time
 transform_MelSpectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=n_mels, mel_scale=mel_scale, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
 
 spectrogram = transform_Spectrogram(waveform)
@@ -131,12 +140,17 @@ reconstructed2 = transform_InverseSpectrogram(spectrogram_complex)
 print("reconstructed2 shape:", reconstructed2.shape)
 reconstructed3 = transform_GriffinLim(reconstructed_spectrogram)
 print("reconstructed3 shape:", reconstructed3.shape)
-torchaudio.save("reconstructed.wav", reconstructed, sample_rate)
-torchaudio.save("reconstructed2.wav", reconstructed2, sample_rate)
-torchaudio.save("original.wav", waveform, sample_rate)
+torchaudio.save(AUDIO_PATH+"reconstructed.wav", reconstructed, sample_rate)  # sounds bad
+torchaudio.save(AUDIO_PATH+"reconstructed2.wav", reconstructed2, sample_rate)  # sounds good
+torchaudio.save(AUDIO_PATH+"reconstructed3.wav", reconstructed3, sample_rate)  # sounds bad
+torchaudio.save(AUDIO_PATH+"original.wav", waveform, sample_rate)
+print(reconstructed-reconstructed2)
+print(reconstructed-reconstructed3)
 data_dim = mel_spectrogram.shape
 # new_sample_rate = 8000
 # transform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=new_sample_rate)
+
+transform = transform_MelSpectrogram
 
 def label_to_index(word):
     # Return the position of the word in labels
@@ -203,7 +217,6 @@ test_loader = torch.utils.data.DataLoader(
     num_workers=num_workers,
     pin_memory=pin_memory,
 )
-
 
 
 class VariationalEncoder(nn.Module):
@@ -353,9 +366,9 @@ loss_over_epochs = []
 
 # The transform needs to live on the same device as the model and the data.
 if should_train_model:
-    transform_MelSpectrogram = transform_MelSpectrogram.to(DEVICE_CONFIG.device)
+    transform = transform.to(DEVICE_CONFIG.device)
     for epoch in tqdm(range(1, n_epoch + 1)):
-        loss = train_one_epoch(model, train_loader, optimizer, transform_MelSpectrogram, DEVICE_CONFIG.device)
+        loss = train_one_epoch(model, train_loader, optimizer, transform, DEVICE_CONFIG.device)
         loss_over_epochs.append(loss)
         # test(model, epoch)
         scheduler.step()
@@ -367,8 +380,16 @@ if should_repickle:
 model = torch.load(TRAINED_MODEL_PATH)
 print("trained model loaded")
 
-
-
+# pass through model
+transformed = transform_MelSpectrogram(waveform)
+with torch.no_grad():
+    rec, _ = model(transformed)
+print(rec.shape)
+rec = transform_InverseMelScale(rec)
+print(rec.shape)
+rec = transform_GriffinLim(rec)
+print(rec.shape)
+torchaudio.save(AUDIO_PATH + "model_rec.wav", rec[0], sample_rate)
 
 
 
