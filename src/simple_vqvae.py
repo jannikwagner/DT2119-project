@@ -14,33 +14,16 @@ from torch import nn
 import torch.nn.functional as F
 import time
 
-DATA_DOWNLOAD_PATH = "../data/sc/"
-DATA_PATH = "../data/sc/SpeechCommands/speech_commands_v0.02"
-PICKLE_DICT = "../simple_pickles/"
-AUDIO_PATH = "../audio/"
+from config import config
 
-os.makedirs(DATA_DOWNLOAD_PATH, exist_ok=True)
-
-default_configuration_path = 'default_config.yaml'
-
-def load_configuration(path):
-    configuration = None
-    with open(path, 'r') as configuration_file:
-        configuration = yaml.load(configuration_file, Loader=yaml.FullLoader)
-    return configuration
-
-CONFIG = load_configuration(default_configuration_path)
-DEVICE_CONFIG = DeviceConfiguration.load_from_configuration(CONFIG)
-
-should_repickle = False
-should_train_model = False
+os.makedirs(config.DATA_DOWNLOAD_PATH, exist_ok=True)
 
 ##############################################
 # LOADING THE DATA
 ###############################################
 class SubsetSC(SPEECHCOMMANDS):
     def __init__(self, subset: str = None, num: int = -1):
-        super().__init__(DATA_DOWNLOAD_PATH, download=True)
+        super().__init__(config.DATA_DOWNLOAD_PATH, download=True)
 
         def load_list(filename):
             filepath = os.path.join(self._path, filename)
@@ -67,13 +50,13 @@ print("SubsetSC loaded")
 waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
 print("waveforms loaded")
 
-if should_repickle:
+if config.should_repickle:
     labels = sorted(list(set(datapoint[2] for datapoint in train_set)))
-    with open(PICKLE_DICT+'labels.pickle', 'wb') as handle:
+    with open(config.PICKLE_DICT+'labels.pickle', 'wb') as handle:
         pickle.dump(labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print("labels saved")  
 else:
-    with open(PICKLE_DICT+'labels.pickle', 'rb') as handle:
+    with open(config.PICKLE_DICT+'labels.pickle', 'rb') as handle:
         labels = pickle.load(handle)
     print("labels loaded")
 
@@ -84,13 +67,13 @@ def make_speaker_dic(data_set):
     speaker_dic = {speaker: i for i, speaker in enumerate(speakers)}
     return speaker_dic
 
-if should_repickle: 
+if config.should_repickle: 
     speaker_dic = make_speaker_dic(train_set)
-    with open(PICKLE_DICT+'speaker_dict.pickle', 'wb') as handle:
+    with open(config.PICKLE_DICT+'speaker_dict.pickle', 'wb') as handle:
         pickle.dump(speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print("speaker_dic saved")  
 else:
-    with open(PICKLE_DICT+'speaker_dict.pickle', 'rb') as handle:
+    with open(config.PICKLE_DICT+'speaker_dict.pickle', 'rb') as handle:
         speaker_dic = pickle.load(handle)
     print("speaker dictionary loaded")
 
@@ -99,28 +82,15 @@ else:
 ###############################################
 waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
 print(waveform.min(), waveform.max())
-n_mels = 80
-mel_scale = "htk"
-n_fft = 400
-hop_length = 256
-win_length = 400
-n_stft = n_fft // 2 + 1
-
-n_mels = 39
-mel_scale = "htk"
-n_fft = 400
-hop_length = None
-win_length = None
-n_stft = n_fft // 2 + 1
 # how to use librosa mel filter defaults?
-transform_SpectrogramComplex = torchaudio.transforms.Spectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length, power=None)  # hard to use in nn
-transform_Spectrogram = torchaudio.transforms.Spectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length)
-transform_InverseSpectrogram = torchaudio.transforms.InverseSpectrogram(n_fft=n_fft, win_length=win_length, hop_length=hop_length)  # need complex
-transform_GriffinLim = torchaudio.transforms.GriffinLim(n_fft=n_fft, hop_length=hop_length, win_length=win_length)  # does not sound too good
+transform_SpectrogramComplex = torchaudio.transforms.Spectrogram(n_fft=config.n_fft, win_length=config.win_length, hop_length=config.hop_length, power=None)  # hard to use in nn
+transform_Spectrogram = torchaudio.transforms.Spectrogram(n_fft=config.n_fft, win_length=config.win_length, hop_length=config.hop_length)
+transform_InverseSpectrogram = torchaudio.transforms.InverseSpectrogram(n_fft=config.n_fft, win_length=config.win_length, hop_length=config.hop_length)  # need complex
+transform_GriffinLim = torchaudio.transforms.GriffinLim(n_fft=config.n_fft, hop_length=config.hop_length, win_length=config.win_length)  # does not sound too good
 
-transform_MelScale = torchaudio.transforms.MelScale(n_mels=n_mels, sample_rate=sample_rate, mel_scale=mel_scale, n_stft=n_stft)
-transform_InverseMelScale = torchaudio.transforms.InverseMelScale(n_mels=n_mels, sample_rate=sample_rate, mel_scale=mel_scale, n_stft=n_stft)  # takes some time
-transform_MelSpectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=n_mels, mel_scale=mel_scale, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+transform_MelScale = torchaudio.transforms.MelScale(n_mels=config.n_mels, sample_rate=sample_rate, mel_scale=config.mel_scale, n_stft=config.n_stft)
+transform_InverseMelScale = torchaudio.transforms.InverseMelScale(n_mels=config.n_mels, sample_rate=sample_rate, mel_scale=config.mel_scale, n_stft=config.n_stft)  # takes some time
+transform_MelSpectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=config.n_mels, mel_scale=config.mel_scale, n_fft=config.n_fft, hop_length=config.hop_length, win_length=config.win_length)
 
 spectrogram = transform_Spectrogram(waveform)
 print("spectrogram shape:", spectrogram.shape)
@@ -140,10 +110,10 @@ reconstructed2 = transform_InverseSpectrogram(spectrogram_complex)
 print("reconstructed2 shape:", reconstructed2.shape)
 reconstructed3 = transform_GriffinLim(reconstructed_spectrogram)
 print("reconstructed3 shape:", reconstructed3.shape)
-torchaudio.save(AUDIO_PATH+"reconstructed.wav", reconstructed, sample_rate)  # sounds bad
-torchaudio.save(AUDIO_PATH+"reconstructed2.wav", reconstructed2, sample_rate)  # sounds good
-torchaudio.save(AUDIO_PATH+"reconstructed3.wav", reconstructed3, sample_rate)  # sounds bad
-torchaudio.save(AUDIO_PATH+"original.wav", waveform, sample_rate)
+torchaudio.save(config.AUDIO_PATH+"reconstructed.wav", reconstructed, sample_rate)  # sounds bad
+torchaudio.save(config.AUDIO_PATH+"reconstructed2.wav", reconstructed2, sample_rate)  # sounds good
+torchaudio.save(config.AUDIO_PATH+"reconstructed3.wav", reconstructed3, sample_rate)  # sounds bad
+torchaudio.save(config.AUDIO_PATH+"original.wav", waveform, sample_rate)
 print(reconstructed-reconstructed2)
 print(reconstructed-reconstructed3)
 data_dim = mel_spectrogram.shape
@@ -190,10 +160,7 @@ def collate_fn(batch):
 
     return tensors, targets, speaker_ids
 
-
-batch_size = 256
-
-if DEVICE_CONFIG.device == "cuda":
+if config.device == "cuda":
     num_workers = 1
     pin_memory = True
 else:
@@ -202,7 +169,7 @@ else:
 
 train_loader = torch.utils.data.DataLoader(
     train_set,
-    batch_size=batch_size,
+    batch_size=config.batch_size,
     shuffle=True,
     collate_fn=collate_fn,
     num_workers=num_workers,
@@ -210,7 +177,7 @@ train_loader = torch.utils.data.DataLoader(
 )
 test_loader = torch.utils.data.DataLoader(
     test_set,
-    batch_size=batch_size,
+    batch_size=config.batch_size,
     shuffle=False,
     drop_last=False,
     collate_fn=collate_fn,
@@ -234,8 +201,8 @@ class VariationalEncoder(nn.Module):
         self.linear3 = nn.Linear(512, latent_dim)
         
         self.N = torch.distributions.Normal(0, 1)
-        self.N.loc = self.N.loc.to(DEVICE_CONFIG.device)
-        self.N.scale = self.N.scale.to(DEVICE_CONFIG.device)
+        self.N.loc = self.N.loc.to(config.device)
+        self.N.scale = self.N.scale.to(config.device)
     
     def forward(self, x):
         #x = torch.flatten(x, start_dim=1)
@@ -286,9 +253,9 @@ class VariationalAutoencoder(nn.Module):
 # CREATE MODEL
 ###############################################
 
-MODEL_PATH = PICKLE_DICT+'simple_vq_vae_model.pickle'
-if should_repickle:
-    model = VariationalAutoencoder(data_dim, 128).to(DEVICE_CONFIG.device)
+MODEL_PATH = config.PICKLE_DICT+'simple_vq_vae_model.pickle'
+if config.should_repickle:
+    model = VariationalAutoencoder(data_dim, 128).to(config.device)
     torch.save(model, MODEL_PATH)
     print("model saved")
 model = torch.load(MODEL_PATH)
@@ -346,8 +313,8 @@ def test(model, epoch):
     model.eval()
     correct = 0
     for data, target, speaker_id in test_loader:
-        data = data.to(DEVICE_CONFIG.device)
-        target = target.to(DEVICE_CONFIG.device)
+        data = data.to(config.device)
+        target = target.to(config.device)
 
         # apply transform and model on whole batch directly on device
         data = transform_MelSpectrogram(data)
@@ -361,21 +328,21 @@ def test(model, epoch):
     print(f"\nTest Epoch: {epoch}\tAccuracy: {correct}/{len(test_loader.dataset)} ({100. * correct / len(test_loader.dataset):.0f}%)\n")
 
 log_interval = 20
-n_epoch = CONFIG['epochs']
+n_epoch = config.epochs
 loss_over_epochs = []
 
 # The transform needs to live on the same device as the model and the data.
-if should_train_model:
-    transform = transform.to(DEVICE_CONFIG.device)
+if config.should_train_model:
+    transform = transform.to(config.device)
     for epoch in tqdm(range(1, n_epoch + 1)):
-        loss = train_one_epoch(model, train_loader, optimizer, transform, DEVICE_CONFIG.device)
+        loss = train_one_epoch(model, train_loader, optimizer, transform, config.device)
         loss_over_epochs.append(loss)
         # test(model, epoch)
         scheduler.step()
 
 
-TRAINED_MODEL_PATH = PICKLE_DICT+'trained_simple_vq_vae_model_' + str(n_epoch) + 'epochs.pickle'
-if should_repickle:
+TRAINED_MODEL_PATH = config.PICKLE_DICT+'trained_simple_vq_vae_model_' + str(n_epoch) + 'epochs.pickle'
+if config.should_repickle:
     torch.save(model, TRAINED_MODEL_PATH)
 model = torch.load(TRAINED_MODEL_PATH)
 print("trained model loaded")
@@ -389,7 +356,7 @@ rec = transform_InverseMelScale(rec)
 print(rec.shape)
 rec = transform_GriffinLim(rec)
 print(rec.shape)
-torchaudio.save(AUDIO_PATH + "model_rec.wav", rec[0], sample_rate)
+torchaudio.save(config.AUDIO_PATH + "model_rec.wav", rec[0], sample_rate)
 
 
 
