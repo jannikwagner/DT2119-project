@@ -8,6 +8,7 @@ from torchaudio.datasets import SPEECHCOMMANDS
 from config import config
 
 os.makedirs(config.DATA_DOWNLOAD_PATH, exist_ok=True)
+os.makedirs(config.AUDIO_PATH, exist_ok=True)
 
 ##############################################
 # LOADING THE DATA
@@ -71,8 +72,6 @@ else:
 ##############################################
 # FORMATTING THE DATA
 ###############################################
-waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
-print(waveform.min(), waveform.max())
 # how to use librosa mel filter defaults?
 transform_SpectrogramComplex = torchaudio.transforms.Spectrogram(n_fft=config.n_fft, win_length=config.win_length, hop_length=config.hop_length, power=None)  # hard to use in nn
 transform_Spectrogram = torchaudio.transforms.Spectrogram(n_fft=config.n_fft, win_length=config.win_length, hop_length=config.hop_length)
@@ -83,35 +82,45 @@ transform_MelScale = torchaudio.transforms.MelScale(n_mels=config.n_mels, sample
 transform_InverseMelScale = torchaudio.transforms.InverseMelScale(n_mels=config.n_mels, sample_rate=sample_rate, mel_scale=config.mel_scale, n_stft=config.n_stft)  # takes some time
 transform_MelSpectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=config.n_mels, mel_scale=config.mel_scale, n_fft=config.n_fft, hop_length=config.hop_length, win_length=config.win_length)
 
-spectrogram = transform_Spectrogram(waveform)
-print("spectrogram shape:", spectrogram.shape)
-spectrogram_complex = transform_SpectrogramComplex(waveform)
-print("spectrogram_complex shape:", spectrogram_complex.shape)
-mel_spectrogram = transform_MelSpectrogram(waveform)
-print("mel_spectrogram shape:", mel_spectrogram.shape)
-mel_spectrogram2 = transform_MelScale(spectrogram)
-print("mel_spectrogram2 shape:", mel_spectrogram2.shape)
-reconstructed_spectrogram = transform_InverseMelScale(mel_spectrogram)
-print("reconstructed_spectrogram shape:", reconstructed_spectrogram.shape)
-reconstructed_spectrogram2 = transform_InverseMelScale(mel_spectrogram2)
-print("reconstructed_spectrogram2 shape:", reconstructed_spectrogram2.shape)
-reconstructed = transform_GriffinLim(spectrogram)
-print("reconstructed shape:", reconstructed.shape)
-reconstructed2 = transform_InverseSpectrogram(spectrogram_complex)
-print("reconstructed2 shape:", reconstructed2.shape)
-reconstructed3 = transform_GriffinLim(reconstructed_spectrogram)
-print("reconstructed3 shape:", reconstructed3.shape)
-torchaudio.save(config.AUDIO_PATH+"reconstructed.wav", reconstructed, sample_rate)  # sounds bad
-torchaudio.save(config.AUDIO_PATH+"reconstructed2.wav", reconstructed2, sample_rate)  # sounds good
-torchaudio.save(config.AUDIO_PATH+"reconstructed3.wav", reconstructed3, sample_rate)  # sounds bad
-torchaudio.save(config.AUDIO_PATH+"original.wav", waveform, sample_rate)
-print(reconstructed-reconstructed2)
-print(reconstructed-reconstructed3)
-data_dim = mel_spectrogram.shape
+def tests(train_set):
+    waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
+    print(waveform, sample_rate, label, speaker_id, utterance_number)
+    print(waveform.min(), waveform.max())
+    spectrogram = transform_Spectrogram(waveform)
+    print("spectrogram shape:", spectrogram.shape)
+    spectrogram_complex = transform_SpectrogramComplex(waveform)
+    print("spectrogram_complex shape:", spectrogram_complex.shape)
+    mel_spectrogram = transform_MelSpectrogram(waveform)
+    print("mel_spectrogram shape:", mel_spectrogram.shape)
+    mel_spectrogram2 = transform_MelScale(spectrogram)
+    print("mel_spectrogram2 shape:", mel_spectrogram2.shape)
+    reconstructed_spectrogram = transform_InverseMelScale(mel_spectrogram)
+    print("reconstructed_spectrogram shape:", reconstructed_spectrogram.shape)
+    reconstructed_spectrogram2 = transform_InverseMelScale(mel_spectrogram2)
+    print("reconstructed_spectrogram2 shape:", reconstructed_spectrogram2.shape)
+    reconstructed = transform_GriffinLim(spectrogram)
+    print("reconstructed shape:", reconstructed.shape)
+    reconstructed2 = transform_InverseSpectrogram(spectrogram_complex)
+    print("reconstructed2 shape:", reconstructed2.shape)
+    reconstructed3 = transform_GriffinLim(reconstructed_spectrogram)
+    print("reconstructed3 shape:", reconstructed3.shape)
+    torchaudio.save(config.AUDIO_PATH+"reconstructed.wav", reconstructed, sample_rate)  # sounds bad
+    torchaudio.save(config.AUDIO_PATH+"reconstructed2.wav", reconstructed2, sample_rate)  # sounds good
+    torchaudio.save(config.AUDIO_PATH+"reconstructed3.wav", reconstructed3, sample_rate)  # sounds bad
+    torchaudio.save(config.AUDIO_PATH+"original.wav", waveform, sample_rate)
+    print(reconstructed-reconstructed2)
+    print(reconstructed-reconstructed3)
+
+transform = transform_MelSpectrogram
+def get_data_dim(train_set):
+    waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
+    transformed = transform(waveform)
+    data_dim = transformed.shape
+    return data_dim
+data_dim = get_data_dim(train_set)
 # new_sample_rate = 8000
 # transform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=new_sample_rate)
 
-transform = transform_MelSpectrogram
 
 def label_to_index(word):
     # Return the position of the word in labels

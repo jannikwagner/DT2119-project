@@ -1,6 +1,10 @@
 import torch
 import dataclasses
 
+"""
+The goal will be to dynamically load configurations from yaml files. Until then, this will serve as interface.
+"""
+
 @dataclasses.dataclass
 class Config:
     DATA_DOWNLOAD_PATH = "../data/sc/"

@@ -174,6 +174,7 @@ print("trained model loaded")
 
 waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
 transformed = transform_MelSpectrogram(waveform)
+model = model.eval()
 with torch.no_grad():
     rec, _ = model(transformed)
 print(rec.shape)
