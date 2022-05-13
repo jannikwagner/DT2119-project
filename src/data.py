@@ -31,7 +31,7 @@ class SubsetSC(SPEECHCOMMANDS):
 
 
 # Create training and testing split of the data. We do not use validation.
-train_set = SubsetSC("training", 100)
+train_set = SubsetSC("training")
 print("trainset length", len(train_set))
 test_set = SubsetSC("testing")
 print("SubsetSC loaded")
