@@ -7,9 +7,6 @@ from torchaudio.datasets import SPEECHCOMMANDS
 
 from config import config
 
-os.makedirs(config.DATA_DOWNLOAD_PATH, exist_ok=True)
-os.makedirs(config.AUDIO_PATH, exist_ok=True)
-
 ##############################################
 # LOADING THE DATA
 ###############################################
@@ -44,11 +41,11 @@ print("waveforms loaded")
 
 if config.should_repickle:
     labels = sorted(list(set(datapoint[2] for datapoint in train_set)))
-    with open(config.PICKLE_DICT+'labels.pickle', 'wb') as handle:
+    with open(config.PICKLE_PATH+'labels.pickle', 'wb') as handle:
         pickle.dump(labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print("labels saved")  
 else:
-    with open(config.PICKLE_DICT+'labels.pickle', 'rb') as handle:
+    with open(config.PICKLE_PATH+'labels.pickle', 'rb') as handle:
         labels = pickle.load(handle)
     print("labels loaded")
 
@@ -61,11 +58,11 @@ def make_speaker_dic(data_set):
 
 if config.should_repickle: 
     speaker_dic = make_speaker_dic(train_set)
-    with open(config.PICKLE_DICT+'speaker_dict.pickle', 'wb') as handle:
+    with open(config.PICKLE_PATH+'speaker_dict.pickle', 'wb') as handle:
         pickle.dump(speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print("speaker_dic saved")  
 else:
-    with open(config.PICKLE_DICT+'speaker_dict.pickle', 'rb') as handle:
+    with open(config.PICKLE_PATH+'speaker_dict.pickle', 'rb') as handle:
         speaker_dic = pickle.load(handle)
     print("speaker dictionary loaded")
 

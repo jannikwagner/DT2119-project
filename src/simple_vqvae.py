@@ -103,7 +103,7 @@ class VariationalAutoencoder(nn.Module):
         z, kl = self.encoder(x)
         return self.decoder(z), kl
 
-model = VariationalAutoencoder(data_dim, 128).to(config.device)
+model = VariationalAutoencoder(data_dim, config.latent_dim).to(config.device)
 
 
 ##############################################
@@ -122,11 +122,11 @@ def train_one_epoch(model, dataloader, optimizer, transform, device, criterion):
         speaker_id = speaker_id.to(device)
         mel_spectrogram = transform(audio)  # batch_size, n_channels, n_mel, n_windows
         
-        reconstructed_mel_spectrogram, kl = model(mel_spectrogram)  # 
+        rec_mel_spectrogram, kl = model(mel_spectrogram)  # 
 
         optimizer.zero_grad()
-        reconstruction_loss = criterion(reconstructed_mel_spectrogram, mel_spectrogram)
-        loss = reconstruction_loss + kl
+        rec_loss = criterion(rec_mel_spectrogram, mel_spectrogram)
+        loss = rec_loss + kl
         loss.backward()
         optimizer.step()
 
@@ -134,7 +134,7 @@ def train_one_epoch(model, dataloader, optimizer, transform, device, criterion):
         total_loss += loss.detach().cpu().numpy().sum()/batchsize
 
         if (batch_idx+1) % 10 == 0:    
-            print(f"--> train step {batch_idx}, loss {loss.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
+            print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.detach().cpu().numpy().sum()/batchsize:.5f}, kl: {kl.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
     
     return total_loss/len(dataloader)
 
@@ -177,7 +177,6 @@ log_interval = 20
 n_epoch = config.epochs
 loss_over_epochs = []
 
-config.TRAINED_MODEL_PATH = config.PICKLE_DICT+'trained_simple_vq_vae_model_' + str(n_epoch) + 'epochs.pickle'
 
 # The transform needs to live on the same device as the model and the data.
 if config.should_train_model:
@@ -188,7 +187,8 @@ if config.should_train_model:
         # test(model, epoch)
         scheduler.step()
     torch.save(model, config.TRAINED_MODEL_PATH)
-model = torch.load(config.TRAINED_MODEL_PATH)
+else:
+    model = torch.load(config.TRAINED_MODEL_PATH)
 print("trained model loaded")
 
 # pass through model
@@ -202,9 +202,10 @@ model = model.eval()
 with torch.no_grad():
     rec_melspec, _ = model(transformed)
 print("rec_melspec")
-print(rec_melspec.shape)
-print(transformed - rec_melspec)
+print(rec_melspec)
 print(rec_melspec.min(), rec_melspec.max())
+print("diff")
+print(transformed - rec_melspec)
 rec_spec = transform_InverseMelScale(rec_melspec)
 print("rec_spec")
 print(rec_spec.shape)
