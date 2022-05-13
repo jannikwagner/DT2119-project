@@ -13,7 +13,7 @@ class Config:
     AUDIO_PATH = "../audio/"
 
     should_repickle = False
-    should_train_model = False
+    should_train_model = True
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 

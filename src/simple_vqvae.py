@@ -9,6 +9,11 @@ import torch
 from data import data_dim, train_loader, test_loader, transform, transform_InverseMelScale, transform_GriffinLim, speaker_dic, transform_MelSpectrogram, train_set
 from config import config
 
+
+##############################################
+# CREATE MODEL
+###############################################
+
 class VariationalEncoder(nn.Module):
     def __init__(self, data_dim, latent_dim):
         super(VariationalEncoder, self).__init__()
@@ -35,9 +40,10 @@ class VariationalEncoder(nn.Module):
         x = F.relu(x)
         x = self.dropout1(x)
         mu =  self.linear2(x)
-        sigma = torch.exp(self.linear3(x))
+        log_sigma = self.linear3(x)
+        sigma = torch.exp(log_sigma)
         z = mu + sigma*self.N.sample(mu.shape)
-        kl = (sigma**2 + mu**2 - torch.log(sigma) - 1/2).sum()
+        kl = (1 + 2*log_sigma - mu**2 - sigma**2).sum() / 2
         return z, kl
 
 
@@ -71,18 +77,7 @@ class VariationalAutoencoder(nn.Module):
         z, kl = self.encoder(x)
         return self.decoder(z), kl
 
-
-##############################################
-# CREATE MODEL
-###############################################
-
-MODEL_PATH = config.PICKLE_DICT+'simple_vq_vae_model.pickle'
-if config.should_repickle:
-    model = VariationalAutoencoder(data_dim, 128).to(config.device)
-    torch.save(model, MODEL_PATH)
-    print("model saved")
-model = torch.load(MODEL_PATH)
-print("model loaded")
+model = VariationalAutoencoder(data_dim, 128).to(config.device)
 
 
 ##############################################
