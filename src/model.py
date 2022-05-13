@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from config import config
-
 """
 Probably there should be different files for different models.
 """
@@ -35,7 +33,7 @@ def kl_divergence(z_mu, z_log_var):
     return kl
 
 class SimpleVariationalEncoder(nn.Module):
-    def __init__(self, data_dim, latent_dim):
+    def __init__(self, data_dim, latent_dim, device):
         super(SimpleVariationalEncoder, self).__init__()
         self.latent_dim = latent_dim
         self.data_dim = data_dim
@@ -55,8 +53,8 @@ class SimpleVariationalEncoder(nn.Module):
         self.fc_z_log_var = nn.Linear(512, latent_dim)
         
         self.N = torch.distributions.Normal(0, 1)
-        self.N.loc = self.N.loc.to(config.device)
-        self.N.scale = self.N.scale.to(config.device)
+        self.N.loc = self.N.loc.to(device)
+        self.N.scale = self.N.scale.to(device)
     
     def forward(self, x):
         #x = torch.flatten(x, start_dim=1)
@@ -67,7 +65,7 @@ class SimpleVariationalEncoder(nn.Module):
         z_var = torch.exp(z_log_var)
         z_std = torch.exp(z_log_var/2)
         z = z_mu + z_std*self.N.sample(z_mu.shape)
-        kl = kl_divergence(z_mu, z_var)
+        kl = kl_divergence(z_mu, z_log_var)
         return z, kl
 
 
@@ -92,13 +90,13 @@ class SimpleDecoder(nn.Module):
 
 
 class SimpleVariationalAutoencoder(nn.Module):
-    def __init__(self, data_dim, latent_dim):
+    def __init__(self, data_dim, latent_dim, device):
         super(SimpleVariationalAutoencoder, self).__init__()
         self.latent_dim = latent_dim
         self.data_dim = data_dim
         self.data_dim_flat = torch.prod(torch.as_tensor(data_dim))
-        self.encoder = SimpleVariationalEncoder(data_dim, latent_dim)
-        self.decoder = SimpleDecoder(data_dim, latent_dim)
+        self.encoder = SimpleVariationalEncoder(data_dim, latent_dim, device)
+        self.decoder = SimpleDecoder(data_dim, latent_dim, device)
 
     def forward(self, x):
         z, kl = self.encoder(x)
@@ -125,7 +123,7 @@ class StackedLinearBlock(nn.Module):
 
 
 class LinearVariationalEncoder(nn.Module):
-    def __init__(self, data_dim, latent_dim, hidden_dims, *args):
+    def __init__(self, data_dim, latent_dim, hidden_dims, device, *args):
         super().__init__()
         self.latent_dim = latent_dim
         self.data_dim = data_dim
@@ -141,8 +139,8 @@ class LinearVariationalEncoder(nn.Module):
         self.fc_z_log_var = nn.Linear(last_hiddem_dim, latent_dim)
         
         self.N = torch.distributions.Normal(0, 1)
-        self.N.loc = self.N.loc.to(config.device)
-        self.N.scale = self.N.scale.to(config.device)
+        self.N.loc = self.N.loc.to(device)
+        self.N.scale = self.N.scale.to(device)
     
     def forward(self, x):
         #x = torch.flatten(x, start_dim=1)
@@ -154,7 +152,7 @@ class LinearVariationalEncoder(nn.Module):
         z_var = torch.exp(z_log_var)
         z_std = torch.exp(z_log_var/2)
         z = z_mu + z_std*self.N.sample(z_mu.shape)
-        kl = kl_divergence(z_mu, z_var)
+        kl = kl_divergence(z_mu, z_log_var)
         return z, kl
 
 
@@ -179,12 +177,12 @@ class LinearDecoder(nn.Module):
 
 
 class LinearVariationalAutoencoder(nn.Module):
-    def __init__(self, data_dim, latent_dim, hidden_dims, *args):
+    def __init__(self, data_dim, latent_dim, hidden_dims, device, *args):
         super().__init__()
         self.latent_dim = latent_dim
         self.data_dim = data_dim
         self.data_dim_flat = torch.prod(torch.as_tensor(data_dim))
-        self.encoder = LinearVariationalEncoder(data_dim, latent_dim, hidden_dims, *args)
+        self.encoder = LinearVariationalEncoder(data_dim, latent_dim, hidden_dims, device, *args)
         self.decoder = LinearDecoder(data_dim, latent_dim, list(reversed(hidden_dims)), *args)
 
     def forward(self, x):
@@ -193,9 +191,9 @@ class LinearVariationalAutoencoder(nn.Module):
 
 def get_model(config, data_dim):
     if config.model_type == "simple_vae":
-        model = SimpleVariationalAutoencoder(data_dim, config.latent_dim)
+        model = SimpleVariationalAutoencoder(data_dim, config.latent_dim, config.device)
     
     elif config.model_type == "linear_vae":
-        model = LinearVariationalAutoencoder(data_dim, config.latent_dim, config.hidden_dims)
+        model = LinearVariationalAutoencoder(data_dim, config.latent_dim, config.hidden_dims, config.device)
 
     return model.to(config.device)

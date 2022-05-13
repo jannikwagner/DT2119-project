@@ -1,4 +1,3 @@
-from distutils.command.config import config
 from tqdm import tqdm
 import torchaudio
 from torch import nn
@@ -7,8 +6,8 @@ import time
 import torch
 import os
 
-from data import data_dim, train_loader, test_loader, transform, transform_InverseMelScale, transform_GriffinLim, speaker_dic, transform_MelSpectrogram, train_set
-from config import config
+from data import DataManager
+from configuration import Config
 from model import get_model
 
 
@@ -50,19 +49,14 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
             print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.detach().cpu().numpy().sum()/batchsize:.5f}, kl: {kl.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
     return total_rec_loss/len(dataloader), total_kl_loss/len(dataloader)
 
-
-
-
 def number_of_correct(pred, target):
     # count number of correct predictions
     return pred.squeeze().eq(target).sum().item()
-
 
 def get_likely_index(tensor):
     # find most likely label index for each element in the batch
     print("tensor", tensor)
     return tensor.argmax(dim=-1)
-
 
 def test_one_epoch(model, epoch):  # currently not used
     model.eval()
@@ -82,7 +76,7 @@ def test_one_epoch(model, epoch):  # currently not used
 
     print(f"\nTest Epoch: {epoch}\tAccuracy: {correct}/{len(test_loader.dataset)} ({100. * correct / len(test_loader.dataset):.0f}%)\n")
 
-def train(model, optimizer, scheduler, criterion, config, transform):
+def train(model, optimizer, scheduler, criterion, config, transform, train_loader):
     rec_loss_over_epochs = []
     kl_loss_over_epochs = []
     transform = transform.to(config.device)
@@ -95,10 +89,8 @@ def train(model, optimizer, scheduler, criterion, config, transform):
         torch.save(model.to("cpu"), config.TRAINED_MODEL_PATH)  # save every epoch in case of failure
     return rec_loss_over_epochs, kl_loss_over_epochs
 
-
-
 # pass through model
-def reconstruct_audio_test(model, config, train_set):
+def reconstruct_audio_test(model, config, train_set, transform_MelSpectrogram, transform_InverseMelScale, transform_GriffinLim):
     waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
     transformed = transform_MelSpectrogram(waveform)
     print("transformed")
@@ -124,19 +116,22 @@ def reconstruct_audio_test(model, config, train_set):
     torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav[0], sample_rate)
 
 if __name__ == "__main__":
+    config = Config()
+    config.init()
 
     # The transform needs to live on the same device as the model and the data.
+    data_manager = DataManager(config)
     if config.should_train_model:
-        model = get_model(config, data_dim)
+        model = get_model(config, data_manager.data_dim)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)  # reduce the learning after 20 epochs by a factor of 10
         criterion = nn.MSELoss()
-        rec_loss_over_epochs, kl_loss_over_epochs = train(model, optimizer, scheduler, criterion, config, transform)
+        rec_loss_over_epochs, kl_loss_over_epochs = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
     else:
         model = torch.load(config.TRAINED_MODEL_PATH)
     print("trained model loaded")
 
-    reconstruct_audio_test(model, config, train_set)
+    reconstruct_audio_test(model, config, data_manager.train_set, data_manager.transform_MelSpectrogram, data_manager.transform_InverseMelScale, data_manager.transform_GriffinLim)
 
 
 

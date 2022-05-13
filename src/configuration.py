@@ -49,9 +49,7 @@ class Config:
     LABELS_PATH = os.path.join(PICKLE_PATH, 'labels.pickle')
     SPEAKER_DICT_PATH = os.path.join(PICKLE_PATH, 'speaker_dict.pickle')
 
-
-config = Config()
-
-os.makedirs(config.DATA_DOWNLOAD_PATH, exist_ok=True)
-os.makedirs(config.AUDIO_PATH, exist_ok=True)
-os.makedirs(config.EXPERIMENT_PATH, exist_ok=True)
+    def init(self):
+        os.makedirs(self.DATA_DOWNLOAD_PATH, exist_ok=True)
+        os.makedirs(self.AUDIO_PATH, exist_ok=True)
+        os.makedirs(self.EXPERIMENT_PATH, exist_ok=True)
