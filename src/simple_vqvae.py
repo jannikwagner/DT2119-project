@@ -13,6 +13,25 @@ from config import config
 ##############################################
 # CREATE MODEL
 ###############################################
+def mc_kl_divergence(self, z, mu, std):
+    # stolen from https://towardsdatascience.com/variational-autoencoder-demystified-with-pytorch-implementation-3a06bee395ed
+    # --------------------------
+    # Monte carlo KL divergence
+    # --------------------------
+    # 1. define the first two probabilities (in this case Normal for both)
+    p = torch.distributions.Normal(torch.zeros_like(mu), torch.ones_like(std))
+    q = torch.distributions.Normal(mu, std)
+
+    # 2. get the probabilities from the equation
+    log_qzx = q.log_prob(z)
+    log_pz = p.log_prob(z)
+
+    # kl
+    kl = (log_qzx - log_pz)
+    
+    # sum over last dim to go from single dim distribution to multi-dim
+    kl = kl.sum(-1)
+    return kl
 
 class VariationalEncoder(nn.Module):
     def __init__(self, data_dim, latent_dim):
@@ -22,11 +41,17 @@ class VariationalEncoder(nn.Module):
         print(data_dim)
         self.data_dim_flat = torch.prod(torch.as_tensor(data_dim))
         print(self.data_dim_flat)
-        self.flatten = torch.nn.Flatten()
-        self.linear1 = nn.Linear(self.data_dim_flat, 512)
-        self.dropout1 = nn.Dropout(0.4)
-        self.linear2 = nn.Linear(512, latent_dim)
-        self.linear3 = nn.Linear(512, latent_dim)
+
+        layers = [
+            torch.nn.Flatten(),
+            nn.Linear(self.data_dim_flat, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU()
+        ]
+        self.seq = nn.Sequential(*layers)
+
+        self.fc_z_mu = nn.Linear(512, latent_dim)
+        self.fc_z_log_var = nn.Linear(512, latent_dim)
         
         self.N = torch.distributions.Normal(0, 1)
         self.N.loc = self.N.loc.to(config.device)
@@ -35,15 +60,13 @@ class VariationalEncoder(nn.Module):
     def forward(self, x):
         #x = torch.flatten(x, start_dim=1)
         # x = torch.flatten(x, 1)
-        x = self.flatten(x)
-        x = self.linear1(x)
-        x = F.relu(x)
-        x = self.dropout1(x)
-        mu =  self.linear2(x)
-        log_sigma = self.linear3(x)
-        sigma = torch.exp(log_sigma)
-        z = mu + sigma*self.N.sample(mu.shape)
-        kl = (1 + 2*log_sigma - mu**2 - sigma**2).sum() / 2
+        x = self.seq(x)
+        z_mu = self.fc_z_mu(x)
+        z_log_var = self.fc_z_log_var(x)
+        z_var = torch.exp(z_log_var)
+        z_std = torch.exp(z_log_var/2)
+        z = z_mu + z_std*self.N.sample(z_mu.shape)
+        kl = torch.mean(-0.5 * torch.sum(1 + z_log_var - z_mu ** 2 - z_var, dim = 1), dim = 0)
         return z, kl
 
 
@@ -53,14 +76,17 @@ class Decoder(nn.Module):
         self.latent_dim = latent_dim
         self.data_dim = data_dim
         self.data_dim_flat = torch.prod(torch.as_tensor(data_dim))
-        self.linear1 = nn.Linear(latent_dim, 512)
-        self.linear2 = nn.Linear(512, self.data_dim_flat)
-        self.unflatten = torch.nn.Unflatten(1, self.data_dim)
+        layers = [
+            nn.Linear(latent_dim, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Linear(512, self.data_dim_flat),
+            torch.nn.Unflatten(1, self.data_dim)
+        ]
+        self.seq = nn.Sequential(*layers)
         
     def forward(self, z):
-        z = F.relu(self.linear1(z))
-        z = self.linear2(z)
-        z = self.unflatten(z)
+        z = self.seq(z)
         return z
 
 
@@ -83,8 +109,9 @@ model = VariationalAutoencoder(data_dim, 128).to(config.device)
 ##############################################
 # TRAINING
 ##############################################
+
 import time
-def train_one_epoch(model, dataloader, optimizer, transform, device):
+def train_one_epoch(model, dataloader, optimizer, transform, device, criterion):
     model.train()
     t = time.time()
     total_loss = 0
@@ -98,14 +125,15 @@ def train_one_epoch(model, dataloader, optimizer, transform, device):
         reconstructed_mel_spectrogram, kl = model(mel_spectrogram)  # 
 
         optimizer.zero_grad()
-        loss = (torch.square(reconstructed_mel_spectrogram - mel_spectrogram)).sum() + kl
+        reconstruction_loss = criterion(reconstructed_mel_spectrogram, mel_spectrogram)
+        loss = reconstruction_loss + kl
         loss.backward()
         optimizer.step()
 
         batchsize = audio.size()[0]
         total_loss += loss.detach().cpu().numpy().sum()/batchsize
 
-        if (batch_idx+1) % 10000 == 0:    
+        if (batch_idx+1) % 10 == 0:    
             print(f"--> train step {batch_idx}, loss {loss.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
     
     return total_loss/len(dataloader)
@@ -113,6 +141,7 @@ def train_one_epoch(model, dataloader, optimizer, transform, device):
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)  # reduce the learning after 20 epochs by a factor of 10
+criterion = nn.MSELoss()
 
 
 def number_of_correct(pred, target):
@@ -154,7 +183,7 @@ config.TRAINED_MODEL_PATH = config.PICKLE_DICT+'trained_simple_vq_vae_model_' + 
 if config.should_train_model:
     transform = transform.to(config.device)
     for epoch in tqdm(range(1, n_epoch + 1)):
-        loss = train_one_epoch(model, train_loader, optimizer, transform, config.device)
+        loss = train_one_epoch(model, train_loader, optimizer, transform, config.device, criterion)
         loss_over_epochs.append(loss)
         # test(model, epoch)
         scheduler.step()
