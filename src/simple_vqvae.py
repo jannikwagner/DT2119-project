@@ -5,10 +5,11 @@ from torch import nn
 import torch.nn.functional as F
 import time
 import torch
+import os
 
 from data import data_dim, train_loader, test_loader, transform, transform_InverseMelScale, transform_GriffinLim, speaker_dic, transform_MelSpectrogram, train_set
 from config import config
-from model import VariationalAutoencoder
+from model import get_model
 
 
 ##############################################
@@ -119,14 +120,14 @@ def reconstruct_audio_test(model, config, train_set):
     print("rec_wav")
     print(rec_wav.min(), rec_wav.max())
     print(rec_wav.shape)
-    torchaudio.save(config.EXPERIMENT_PATH + "model_rec.wav", rec_wav[0], sample_rate)
-    torchaudio.save(config.AUDIO_PATH + "original.wav", rec_wav[0], sample_rate)
+    torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "model_rec.wav"), rec_wav[0], sample_rate)
+    torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav[0], sample_rate)
 
 if __name__ == "__main__":
 
     # The transform needs to live on the same device as the model and the data.
     if config.should_train_model:
-        model = VariationalAutoencoder(data_dim, config.latent_dim).to(config.device)
+        model = get_model(config, data_dim)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)  # reduce the learning after 20 epochs by a factor of 10
         criterion = nn.MSELoss()

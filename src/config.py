@@ -23,9 +23,12 @@ class Config:
 
     epochs = 2
     batch_size = 256
-    latent_dim = 256
 
-    experiment_name = "exp2"
+    model_type = "linear_vae"
+    latent_dim = 256
+    hidden_dims = [1024, 512, 512]
+
+    experiment_name = "exp3"
 
     # n_mels = 80
     # mel_scale = "htk"
@@ -43,6 +46,8 @@ class Config:
 
     EXPERIMENT_PATH = os.path.join(EXPERIMENTS_PATH, experiment_name)
     TRAINED_MODEL_PATH = os.path.join(EXPERIMENT_PATH,'trained_simple_vae_model_' + str(epochs) + 'epochs.pth')
+    LABELS_PATH = os.path.join(PICKLE_PATH, 'labels.pickle')
+    SPEAKER_DICT_PATH = os.path.join(PICKLE_PATH, 'speaker_dict.pickle')
 
 
 config = Config()
