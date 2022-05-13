@@ -19,6 +19,8 @@ class Config:
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    log_interval = 10
+
     epochs = 2
     batch_size = 256
     latent_dim = 256
