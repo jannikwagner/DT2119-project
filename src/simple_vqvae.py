@@ -1,137 +1,64 @@
-from distutils.command.config import config
 from tqdm import tqdm
 import torchaudio
 from torch import nn
 import torch.nn.functional as F
 import time
 import torch
+import os
 
-from data import data_dim, train_loader, test_loader, transform, transform_InverseMelScale, transform_GriffinLim, speaker_dic, transform_MelSpectrogram, train_set
-from config import config
-
-class VariationalEncoder(nn.Module):
-    def __init__(self, data_dim, latent_dim):
-        super(VariationalEncoder, self).__init__()
-        self.latent_dim = latent_dim
-        self.data_dim = data_dim
-        print(data_dim)
-        self.data_dim_flat = torch.prod(torch.as_tensor(data_dim))
-        print(self.data_dim_flat)
-        self.flatten = torch.nn.Flatten()
-        self.linear1 = nn.Linear(self.data_dim_flat, 512)
-        self.dropout1 = nn.Dropout(0.4)
-        self.linear2 = nn.Linear(512, latent_dim)
-        self.linear3 = nn.Linear(512, latent_dim)
-        
-        self.N = torch.distributions.Normal(0, 1)
-        self.N.loc = self.N.loc.to(config.device)
-        self.N.scale = self.N.scale.to(config.device)
-    
-    def forward(self, x):
-        #x = torch.flatten(x, start_dim=1)
-        # x = torch.flatten(x, 1)
-        x = self.flatten(x)
-        x = self.linear1(x)
-        x = F.relu(x)
-        x = self.dropout1(x)
-        mu =  self.linear2(x)
-        sigma = torch.exp(self.linear3(x))
-        z = mu + sigma*self.N.sample(mu.shape)
-        kl = (sigma**2 + mu**2 - torch.log(sigma) - 1/2).sum()
-        return z, kl
-
-
-class Decoder(nn.Module):
-    def __init__(self, data_dim, latent_dim):
-        super(Decoder, self).__init__()
-        self.latent_dim = latent_dim
-        self.data_dim = data_dim
-        self.data_dim_flat = torch.prod(torch.as_tensor(data_dim))
-        self.linear1 = nn.Linear(latent_dim, 512)
-        self.linear2 = nn.Linear(512, self.data_dim_flat)
-        self.unflatten = torch.nn.Unflatten(1, self.data_dim)
-        
-    def forward(self, z):
-        z = F.relu(self.linear1(z))
-        z = self.linear2(z)
-        z = self.unflatten(z)
-        return z
-
-
-class VariationalAutoencoder(nn.Module):
-    def __init__(self, data_dim, latent_dim):
-        super(VariationalAutoencoder, self).__init__()
-        self.latent_dim = latent_dim
-        self.data_dim = data_dim
-        self.data_dim_flat = torch.prod(torch.as_tensor(data_dim))
-        self.encoder = VariationalEncoder(data_dim, latent_dim)
-        self.decoder = Decoder(data_dim, latent_dim)
-
-    def forward(self, x):
-        z, kl = self.encoder(x)
-        return self.decoder(z), kl
+from data import DataManager
+from configuration import Config
+from model import get_model
 
 
 ##############################################
 # CREATE MODEL
 ###############################################
 
-MODEL_PATH = config.PICKLE_DICT+'simple_vq_vae_model.pickle'
-if config.should_repickle:
-    model = VariationalAutoencoder(data_dim, 128).to(config.device)
-    torch.save(model, MODEL_PATH)
-    print("model saved")
-model = torch.load(MODEL_PATH)
-print("model loaded")
-
 
 ##############################################
 # TRAINING
 ##############################################
+
 import time
-def train_one_epoch(model, dataloader, optimizer, transform, device):
+def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
     model.train()
     t = time.time()
-    total_loss = 0
+    total_rec_loss = 0
+    total_kl_loss = 0
 
     for batch_idx, (audio, label, speaker_id) in enumerate(dataloader):
-        audio = audio.to(device)  # batch_size, n_channels, n_samples
-        label = label.to(device)
-        speaker_id = speaker_id.to(device)
+        audio = audio.to(config.device)  # batch_size, n_channels, n_samples
+        label = label.to(config.device)
+        speaker_id = speaker_id.to(config.device)
         mel_spectrogram = transform(audio)  # batch_size, n_channels, n_mel, n_windows
         
-        reconstructed_mel_spectrogram, kl = model(mel_spectrogram)  # 
+        rec_mel_spectrogram, kl = model(mel_spectrogram)  # 
 
         optimizer.zero_grad()
-        loss = (torch.square(reconstructed_mel_spectrogram - mel_spectrogram)).sum() + kl
+        rec_loss = criterion(rec_mel_spectrogram, mel_spectrogram)
+        loss = rec_loss + kl
         loss.backward()
         optimizer.step()
 
         batchsize = audio.size()[0]
-        total_loss += loss.detach().cpu().numpy().sum()/batchsize
+        total_rec_loss += loss.detach().cpu().numpy().sum()
+        total_kl_loss += loss.detach().cpu().numpy().sum()
 
-        if (batch_idx+1) % 10000 == 0:    
-            print(f"--> train step {batch_idx}, loss {loss.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
-    
-    return total_loss/len(dataloader)
-
-
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)  # reduce the learning after 20 epochs by a factor of 10
-
+        if (batch_idx+1) % config.log_interval == 0:    
+            print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.detach().cpu().numpy().sum()/batchsize:.5f}, kl: {kl.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
+    return total_rec_loss/len(dataloader), total_kl_loss/len(dataloader)
 
 def number_of_correct(pred, target):
     # count number of correct predictions
     return pred.squeeze().eq(target).sum().item()
-
 
 def get_likely_index(tensor):
     # find most likely label index for each element in the batch
     print("tensor", tensor)
     return tensor.argmax(dim=-1)
 
-
-def test(model, epoch):
+def test_one_epoch(model, epoch):  # currently not used
     model.eval()
     correct = 0
     for data, target, speaker_id in test_loader:
@@ -149,47 +76,63 @@ def test(model, epoch):
 
     print(f"\nTest Epoch: {epoch}\tAccuracy: {correct}/{len(test_loader.dataset)} ({100. * correct / len(test_loader.dataset):.0f}%)\n")
 
-log_interval = 20
-n_epoch = config.epochs
-loss_over_epochs = []
-
-config.TRAINED_MODEL_PATH = config.PICKLE_DICT+'trained_simple_vq_vae_model_' + str(n_epoch) + 'epochs.pickle'
-
-# The transform needs to live on the same device as the model and the data.
-if config.should_train_model:
+def train(model, optimizer, scheduler, criterion, config, transform, train_loader):
+    rec_loss_over_epochs = []
+    kl_loss_over_epochs = []
     transform = transform.to(config.device)
-    for epoch in tqdm(range(1, n_epoch + 1)):
-        loss = train_one_epoch(model, train_loader, optimizer, transform, config.device)
-        loss_over_epochs.append(loss)
+    for epoch in tqdm(range(1, config.epochs + 1)):
+        rec_loss, kl_loss = train_one_epoch(model, train_loader, optimizer, transform, config, criterion)
+        rec_loss_over_epochs.append(rec_loss)
+        kl_loss_over_epochs.append(kl_loss)
         # test(model, epoch)
         scheduler.step()
-    torch.save(model, config.TRAINED_MODEL_PATH)
-model = torch.load(config.TRAINED_MODEL_PATH)
-print("trained model loaded")
+        torch.save(model.to("cpu"), config.TRAINED_MODEL_PATH)  # save every epoch in case of failure
+    return rec_loss_over_epochs, kl_loss_over_epochs
 
 # pass through model
+def reconstruct_audio_test(model, config, train_set, transform_MelSpectrogram, transform_InverseMelScale, transform_GriffinLim):
+    waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
+    transformed = transform_MelSpectrogram(waveform)
+    print("transformed")
+    print(transformed)
+    print(transformed.min(), transformed.max())
+    model = model.eval()
+    with torch.no_grad():
+        rec_melspec, _ = model(transformed)
+    print("rec_melspec")
+    print(rec_melspec)
+    print(rec_melspec.min(), rec_melspec.max())
+    print("diff")
+    print(transformed - rec_melspec)
+    rec_spec = transform_InverseMelScale(rec_melspec)
+    print("rec_spec")
+    print(rec_spec.shape)
+    print(rec_spec.min(), rec_spec.max())
+    rec_wav = transform_GriffinLim(rec_spec)
+    print("rec_wav")
+    print(rec_wav.min(), rec_wav.max())
+    print(rec_wav.shape)
+    torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "model_rec.wav"), rec_wav[0], sample_rate)
+    torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav[0], sample_rate)
 
-waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
-transformed = transform_MelSpectrogram(waveform)
-print("transformed")
-print(transformed)
-print(transformed.min(), transformed.max())
-model = model.eval()
-with torch.no_grad():
-    rec_melspec, _ = model(transformed)
-print("rec_melspec")
-print(rec_melspec.shape)
-print(transformed - rec_melspec)
-print(rec_melspec.min(), rec_melspec.max())
-rec_spec = transform_InverseMelScale(rec_melspec)
-print("rec_spec")
-print(rec_spec.shape)
-print(rec_spec.min(), rec_spec.max())
-rec_wav = transform_GriffinLim(rec_spec)
-print("rec_wav")
-print(rec_wav.min(), rec_wav.max())
-print(rec_wav.shape)
-torchaudio.save(config.AUDIO_PATH + "model_rec.wav", rec_wav[0], sample_rate)
+if __name__ == "__main__":
+    config = Config()
+    config.init()
+
+    # The transform needs to live on the same device as the model and the data.
+    data_manager = DataManager(config)
+    if config.should_train_model:
+        model = get_model(config, data_manager.data_dim)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)  # reduce the learning after 20 epochs by a factor of 10
+        criterion = nn.MSELoss()
+        rec_loss_over_epochs, kl_loss_over_epochs = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
+    else:
+        model = torch.load(config.TRAINED_MODEL_PATH)
+    print("trained model loaded")
+
+    reconstruct_audio_test(model, config, data_manager.train_set, data_manager.transform_MelSpectrogram, data_manager.transform_InverseMelScale, data_manager.transform_GriffinLim)
+
 
 
 # def predict(tensor):
