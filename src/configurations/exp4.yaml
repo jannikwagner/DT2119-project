@@ -4,7 +4,7 @@ PICKLE_PATH: "../simple_pickles/"
 AUDIO_PATH: "../audio/"
 EXPERIMENTS_PATH: "../experiments/"
 
-should_repickle: True
+should_repickle: False
 should_train_model: True
 
 device: "cuda"
