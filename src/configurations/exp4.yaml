@@ -5,24 +5,24 @@ AUDIO_PATH: "../audio/"
 EXPERIMENTS_PATH: "../experiments/"
 
 should_repickle: False
-should_train_model: False
+should_train_model: True
 
 device: "cuda"
 
-log_interval: 10
+log_interval: 100
 
-epochs: 2
-batch_size: 256
+epochs: 50
+batch_size: 512
 lr: 0.01
-lr_step_size: 2
-lr_gamma: 0.5
+lr_step_size: 10
+lr_gamma: 0.1
 weight_decay: 0.0001
 
 model_type: "linear_vae"
 latent_dim: 256
 hidden_dims: [1024, 512, 512]
 
-experiment_name: "exp3"
+experiment_name: "exp4"
 
 # n_mels: 80
 # mel_scale: "htk"

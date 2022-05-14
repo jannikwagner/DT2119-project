@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import time
 import torch
 import os
+import matplotlib.pyplot as plt
 
 from data import DataManager
 from configuration import Config
@@ -42,8 +43,8 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         optimizer.step()
 
         batchsize = audio.size()[0]
-        total_rec_loss += loss.detach().cpu().numpy().sum()
-        total_kl_loss += loss.detach().cpu().numpy().sum()
+        total_rec_loss += rec_loss.detach().cpu().numpy().sum()
+        total_kl_loss += kl.detach().cpu().numpy().sum()
 
         if (batch_idx+1) % config.log_interval == 0:  
             print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.detach().cpu().numpy().sum()/batchsize:.5f}, kl: {kl.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
@@ -115,11 +116,20 @@ def reconstruct_audio_test(model, config, train_set, transform_MelSpectrogram, t
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "model_rec.wav"), rec_wav[0], sample_rate)
     torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav[0], sample_rate)
 
+def plot(rec_loss_over_epochs, kl_loss_over_epochs, config):
+    n = len(rec_loss_over_epochs)
+    plt.plot(range(n), rec_loss_over_epochs, label="rec_loss")
+    plt.plot(range(n), kl_loss_over_epochs, label="kl_loss")
+    plt.xlabel("epoch")
+    plt.ylabel("loss")
+    plt.legend()
+    plt.savefig(os.path.join(config.EXPERIMENT_PATH, "loss.png"))
+
 def config_init(config):
     config
 
 if __name__ == "__main__":
-    configuration_path = 'configurations' + os.sep + 'exp3.yaml'
+    configuration_path = 'configurations' + os.sep + 'exp4.yaml'
     config = Config(configuration_path)
 
     print("config", config)
@@ -131,16 +141,17 @@ if __name__ == "__main__":
     data_manager = DataManager(config)
     if config.should_train_model:
         model = get_model(config, data_manager.data_dim)
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)  # reduce the learning after 20 epochs by a factor of 10
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.lr_step_size, gamma=config.lr_gamma)  # reduce the learning after 20 epochs by a factor of 10
         criterion = nn.MSELoss()
         rec_loss_over_epochs, kl_loss_over_epochs = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
+        plot(rec_loss_over_epochs, kl_loss_over_epochs, config)   
     else:
         model = torch.load(config.TRAINED_MODEL_PATH)
     print("trained model loaded")
 
     reconstruct_audio_test(model, config, data_manager.train_set, data_manager.transform_MelSpectrogram, data_manager.transform_InverseMelScale, data_manager.transform_GriffinLim)
-
+    
 
 
 # def predict(tensor):
