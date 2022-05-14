@@ -45,7 +45,7 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         total_rec_loss += loss.detach().cpu().numpy().sum()
         total_kl_loss += loss.detach().cpu().numpy().sum()
 
-        if (batch_idx+1) % config.log_interval == 0:    
+        if (batch_idx+1) % config.log_interval == 0:  
             print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.detach().cpu().numpy().sum()/batchsize:.5f}, kl: {kl.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
     return total_rec_loss/len(dataloader), total_kl_loss/len(dataloader)
 
@@ -58,7 +58,7 @@ def get_likely_index(tensor):
     print("tensor", tensor)
     return tensor.argmax(dim=-1)
 
-def test_one_epoch(model, epoch):  # currently not used
+def test_one_epoch(model, epoch, test_loader, transform, speaker_dic):  # currently not used
     model.eval()
     correct = 0
     for data, target, speaker_id in test_loader:
@@ -115,9 +115,17 @@ def reconstruct_audio_test(model, config, train_set, transform_MelSpectrogram, t
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "model_rec.wav"), rec_wav[0], sample_rate)
     torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav[0], sample_rate)
 
+def config_init(config):
+    config
+
 if __name__ == "__main__":
-    config = Config()
-    config.init()
+    configuration_path = 'configurations' + os.sep + 'exp3.yaml'
+    config = Config(configuration_path)
+
+    print("config", config)
+    os.makedirs(config.DATA_DOWNLOAD_PATH, exist_ok=True)
+    os.makedirs(config.AUDIO_PATH, exist_ok=True)
+    os.makedirs(config.EXPERIMENT_PATH, exist_ok=True)
 
     # The transform needs to live on the same device as the model and the data.
     data_manager = DataManager(config)

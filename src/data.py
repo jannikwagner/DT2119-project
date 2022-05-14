@@ -5,7 +5,6 @@ import torch
 import torchaudio
 from torchaudio.datasets import SPEECHCOMMANDS
 
-from configuration import Config  # only for type information
 
 ##############################################
 # LOADING THE DATA
@@ -30,7 +29,7 @@ class SubsetSC(SPEECHCOMMANDS):
             self._walker = self._walker[:num]
 
 class DataManager:  # needs modularization!
-    def __init__(self, config: Config):
+    def __init__(self, config):
         # Create training and testing split of the data. We do not use validation.
         self.train_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "training")
         print("trainset length", len(self.train_set))
