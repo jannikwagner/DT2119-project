@@ -76,12 +76,9 @@ class Config:
         self.SPEAKER_DICT_PATH = os.path.join(self.PICKLE_PATH, 'speaker_dict.pickle')
         self.CONFIG_PATH = os.path.join(self.EXPERIMENT_PATH, 'config.yaml')
 
-        os.makedirs(self.DATA_DOWNLOAD_PATH, exist_ok=True)
         os.makedirs(self.AUDIO_PATH, exist_ok=True)
         os.makedirs(self.EXPERIMENT_PATH, exist_ok=True)
-        os.makedirs(self.PICKLE_PATH, exist_ok=True)
-        os.makedirs(self.DATA_PATH, exist_ok=True)
-        
+        os.makedirs(self.PICKLE_PATH, exist_ok=True)        
 
         with open(self.CONFIG_PATH, 'w') as configuration_file:
             yaml.dump(self.config, configuration_file)
