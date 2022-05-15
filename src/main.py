@@ -87,7 +87,7 @@ def train(model, optimizer, scheduler, criterion, config, transform, train_loade
         kl_loss_over_epochs.append(kl_loss)
         # test(model, epoch)
         scheduler.step()
-        torch.save(model.to(config.device), config.TRAINED_MODEL_PATH)  # save every epoch in case of failure
+        torch.save(model.to("cpu"), config.TRAINED_MODEL_PATH)  # save every epoch in case of failure (save he cpu version so that it can be loaded from cpu)
     return rec_loss_over_epochs, kl_loss_over_epochs
 
 # pass through model
