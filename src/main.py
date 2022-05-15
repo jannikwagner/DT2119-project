@@ -129,7 +129,7 @@ def config_init(config):
     config
 
 if __name__ == "__main__":
-    configuration_path = 'configurations' + os.sep + 'exp4.yaml'
+    configuration_path = 'configurations' + os.sep + 'exp5.yaml'
     config = Config(configuration_path)
 
     print("config", config.config)

@@ -1,0 +1,40 @@
+# Tried to get params from https://github.com/XiaoyuBIE1994/DVAE/blob/9070de12f01be26e730948784f32bba1411990dc/dvae/model/vae.py#L42
+
+DATA_DOWNLOAD_PATH: "../data/sc/"
+DATA_PATH: "../data/sc/SpeechCommands/speech_commands_v0.02"
+PICKLE_PATH: "../simple_pickles/"
+AUDIO_PATH: "../audio/"
+EXPERIMENTS_PATH: "../experiments/"
+
+should_repickle: False
+should_train_model: True
+
+device: "cuda"
+
+log_interval: 100
+
+epochs: 5
+batch_size: 512
+lr: 0.01
+lr_step_size: 10
+lr_gamma: 0.1
+weight_decay: 0.0001
+
+model_type: "linear_vae"
+latent_dim: 128
+hidden_dims: [512, 256, 256]
+
+experiment_name: "exp5"
+
+# n_mels: 80
+# mel_scale: "htk"
+# n_fft: 400
+# hop_length: 256
+# win_length: 400
+# n_stft: n_fft // 2 + 1
+
+n_mels: 39
+mel_scale: "htk"
+n_fft: 400
+hop_length: None
+win_length: None
