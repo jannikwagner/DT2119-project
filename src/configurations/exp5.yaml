@@ -11,7 +11,7 @@ device: "cuda"
 
 log_interval: 100
 
-epochs: 5
+epochs: 50
 batch_size: 8192
 lr: 0.1
 lr_step_size: 10

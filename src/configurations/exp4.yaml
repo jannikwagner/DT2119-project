@@ -5,13 +5,13 @@ AUDIO_PATH: "../audio/"
 EXPERIMENTS_PATH: "../experiments/"
 
 should_repickle: False
-should_train_model: True
+should_train_model: False
 
 device: "cuda"
 
 log_interval: 100
 
-epochs: 5
+epochs: 50
 batch_size: 8192
 lr: 0.1
 lr_step_size: 10

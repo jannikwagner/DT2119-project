@@ -150,7 +150,7 @@ if __name__ == "__main__":
         rec_loss_over_epochs, kl_loss_over_epochs = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
         plot(rec_loss_over_epochs, kl_loss_over_epochs, config)   
     else:
-        model = torch.load(config.TRAINED_MODEL_PATH)
+        model = torch.load(config.TRAINED_MODEL_PATH, map_location=config.device)
     print("trained model loaded")
 
     reconstruct_audio_test(model.to(config.device), config, data_manager.train_set, data_manager.transform_MelSpectrogram, data_manager.transform_InverseMelScale, data_manager.transform_GriffinLim)
