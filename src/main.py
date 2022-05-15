@@ -6,6 +6,7 @@ import time
 import torch
 import os
 import matplotlib.pyplot as plt
+import numpy as np
 
 from data import DataManager
 from configuration import Config
@@ -83,11 +84,16 @@ def train(model, optimizer, scheduler, criterion, config, transform, train_loade
     transform = transform.to(config.device)
     for epoch in tqdm(range(1, config.epochs + 1)):
         rec_loss, kl_loss = train_one_epoch(model, train_loader, optimizer, transform, config, criterion)
+        print(f"--> epoch: {epoch}, rec_loss: {rec_loss:.5f}, kl: {kl_loss:.5f}")
+        if np.isnan(rec_loss) or np.isnan(kl_loss):
+            print("LOSS IS NAN, interrupting")
+            break
+
         rec_loss_over_epochs.append(rec_loss)
         kl_loss_over_epochs.append(kl_loss)
         # test(model, epoch)
         scheduler.step()
-        torch.save(model.to(config.device), config.TRAINED_MODEL_PATH)  # save every epoch in case of failure (TODO: should save he cpu version so that it can be loaded from cpu)
+        torch.save(model, config.TRAINED_MODEL_PATH)  # save every epoch in case of failure (TODO: should save he cpu version so that it can be loaded from cpu)
     return rec_loss_over_epochs, kl_loss_over_epochs
 
 # pass through model
@@ -115,8 +121,8 @@ def reconstruct_audio_test(model, config, train_set, transform_MelSpectrogram, t
     print("rec_wav")
     print(rec_wav.min(), rec_wav.max())
     print(rec_wav.shape)
-    torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "model_rec.wav"), rec_wav[0], sample_rate)
-    torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav[0], sample_rate)
+    torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "model_rec.wav"), rec_wav.to("cpu")[0], sample_rate)
+    torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav.to("cpu")[0], sample_rate)
 
 def plot(rec_loss_over_epochs, kl_loss_over_epochs, config):
     n = len(rec_loss_over_epochs)
