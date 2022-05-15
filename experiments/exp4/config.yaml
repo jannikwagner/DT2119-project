@@ -3,7 +3,7 @@ DATA_DOWNLOAD_PATH: ../data/sc/
 DATA_PATH: ../data/sc/SpeechCommands/speech_commands_v0.02
 EXPERIMENTS_PATH: ../experiments/
 PICKLE_PATH: ../simple_pickles/
-batch_size: 8192
+batch_size: 1024
 device: cuda
 epochs: 50
 experiment_name: exp4

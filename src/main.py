@@ -34,10 +34,10 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         label = label.to(config.device)
         speaker_id = speaker_id.to(config.device)
         mel_spectrogram = transform(audio)  # batch_size, n_channels, n_mel, n_windows
+        optimizer.zero_grad()
         
         rec_mel_spectrogram, kl = model(mel_spectrogram)  # 
 
-        optimizer.zero_grad()
         rec_loss = criterion(rec_mel_spectrogram, mel_spectrogram)
         loss = rec_loss + kl
         loss.backward()

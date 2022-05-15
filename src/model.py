@@ -148,7 +148,7 @@ class LinearVariationalEncoder(nn.Module):
         x = self.flatten(x)
         x = self.seq(x)
         z_mu = self.fc_z_mu(x)
-        z_log_var = self.fc_z_log_var(x)
+        z_log_var = F.tanh(self.fc_z_log_var(x))
         z_var = torch.exp(z_log_var)
         z_std = torch.exp(z_log_var/2)
         z = z_mu + z_std*self.N.sample(z_mu.shape)
