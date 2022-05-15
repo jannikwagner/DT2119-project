@@ -66,7 +66,7 @@ class Config:
                 v = None
             self.__setattr__(k, v)
         
-        self.device = "cuda" # if (self.device == "cuda" and torch.cuda.is_available()) else "cpu"
+        self.device = "cuda" if (self.device == "cuda" and torch.cuda.is_available()) else "cpu"
         self.n_stft = self.n_fft // 2 + 1
 
 

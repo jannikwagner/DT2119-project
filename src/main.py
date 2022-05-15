@@ -151,7 +151,7 @@ if __name__ == "__main__":
         model = torch.load(config.TRAINED_MODEL_PATH)
     print("trained model loaded")
 
-    reconstruct_audio_test(model, config, data_manager.train_set, data_manager.transform_MelSpectrogram, data_manager.transform_InverseMelScale, data_manager.transform_GriffinLim)
+    reconstruct_audio_test(model.to(config.device), config, data_manager.train_set, data_manager.transform_MelSpectrogram, data_manager.transform_InverseMelScale, data_manager.transform_GriffinLim)
     
 
 
