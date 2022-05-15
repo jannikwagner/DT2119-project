@@ -36,5 +36,5 @@ experiment_name: "exp5"
 n_mels: 39
 mel_scale: "htk"
 n_fft: 400
-hop_length: None
-win_length: None
+hop_length:
+win_length:

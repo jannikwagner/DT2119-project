@@ -23,7 +23,7 @@ from model import get_model
 
 import time
 def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
-    model.train()
+    model = model.train()
     t = time.time()
     total_rec_loss = 0
     total_kl_loss = 0
@@ -93,6 +93,8 @@ def train(model, optimizer, scheduler, criterion, config, transform, train_loade
 # pass through model
 def reconstruct_audio_test(model, config, train_set, transform_MelSpectrogram, transform_InverseMelScale, transform_GriffinLim):
     waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
+    waveform = waveform.to(config.device)
+    transform_MelSpectrogram, transform_InverseMelScale, transform_GriffinLim = transform_MelSpectrogram.to(config.device), transform_InverseMelScale.to(config.device), transform_GriffinLim.to(config.device)
     transformed = transform_MelSpectrogram(waveform)
     print("transformed")
     print(transformed)
@@ -129,7 +131,7 @@ def config_init(config):
     config
 
 if __name__ == "__main__":
-    configuration_path = 'configurations' + os.sep + 'exp5.yaml'
+    configuration_path = 'configurations' + os.sep + 'exp4.yaml'
     config = Config(configuration_path)
 
     print("config", config.config)
