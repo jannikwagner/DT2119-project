@@ -14,7 +14,7 @@ def get_model(config, data_dim):
     elif config.model_type == "linear_vae":
         model = LinearVariationalAutoencoder(data_dim, config.latent_dim, config.hidden_dims, config.device)
 
-    elif config.model_type == "conv2_vae":
+    elif config.model_type == "conv2d_vae":
         model = conv2d_builder(data_dim, config.latent_dim, config.device, config.channels, config.strides, config.kernel_sizes, config.paddings, config.nonlinearity, config.batch_norm)
     return model.to(config.device)
 
@@ -160,7 +160,7 @@ class LinearVariationalEncoder(nn.Module):
         x = self.flatten(x)
         x = self.seq(x)
         z_mu = self.fc_z_mu(x)
-        z_log_var = self.fc_z_log_var(x)
+        z_log_var = F.tanh(self.fc_z_log_var(x))
         z_var = torch.exp(z_log_var)
         z_std = torch.exp(z_log_var/2)
         z = z_mu + z_std*self.N.sample(z_mu.shape)
@@ -224,19 +224,24 @@ class Conv2dStack(nn.Module):
         print(c, h, w)
 
         layers = []
-        for c2, k, s, p in channels, kernel_sizes, strides, paddings:
+        for c2, k, s, p in zip(channels, kernel_sizes, strides, paddings):
             layers.append(nn.Conv2d(c, c2, k, s, p))
             layers.append(nonlinearity)
             if batch_norm:
-                layers.append(nn.BatchNorm1d(c2))
+                layers.append(nn.BatchNorm2d(c2))
             c, h, w = update_chw(h, w, c2, p, k, s)
+            print(c, h, w)
         
         layers.append(nn.Flatten())
 
+        self.layers = layers
         self.seq = nn.Sequential(*layers)
 
-        self.dim = torch.prod([c, h, w])
+        self.dim = torch.prod(torch.as_tensor([c, h, w]))
     def forward(self, x):
+        # for l in self.layers:
+        #     x = l(x)
+        #     print(x.shape)
         x = self.seq(x)
         return x
 
@@ -251,21 +256,25 @@ class TransposedConv2dStack(nn.Module):
         print(c, h, w)
 
         layers = []
-        for c2, k, s, p in channels, kernel_sizes, strides, paddings:
+        for c2, k, s, p in zip(channels, kernel_sizes, strides, paddings):
             if batch_norm:
-                layers.append(nn.BatchNorm1d(c2))
+                layers.append(nn.BatchNorm2d(c))
             layers.append(nonlinearity)
             layers.append(nn.ConvTranspose2d(c2, c, k, s, p))
             c, h, w = update_chw(h, w, c2, p, k, s)
         
-        layers.append(nn.Unflatten((c, h, w)))
+        layers.append(nn.Unflatten(1, (c, h, w)))
 
         layers = list(reversed(layers))
 
+        self.layers = layers
         self.seq = nn.Sequential(*layers)
 
-        self.dim = torch.prod([c, h, w])
+        self.dim = torch.prod(torch.as_tensor([c, h, w]))
     def forward(self, x):
+        # for l in self.layers:
+        #     x = l(x)
+        #     print(x.shape)
         x = self.seq(x)
         return x
 
@@ -276,14 +285,14 @@ class Encoder(nn.Module):
         dim = stack.dim
 
         self.fc_z_mu = nn.Linear(dim, latent_dim)
-        self.fc_z_log_var = F.tanh(nn.Linear(dim, latent_dim))
+        self.fc_z_log_var = nn.Linear(dim, latent_dim)
     
     def forward(self, x):
         #x = torch.flatten(x, start_dim=1)
         # x = torch.flatten(x, 1)
         x = self.stack(x)
         z_mu = self.fc_z_mu(x)
-        z_log_var = self.fc_z_log_var(x)
+        z_log_var = F.tanh(self.fc_z_log_var(x))
         return z_mu, z_log_var
 
 
@@ -296,8 +305,8 @@ class Decoder(nn.Module):
         self.fc = nn.Linear(latent_dim, dim)
         
     def forward(self, z):
-        z = self.stack(z)
-        x_rec = self.fc(z)
+        z = self.fc(z)
+        x_rec = self.stack(z)
         return x_rec
 
 
