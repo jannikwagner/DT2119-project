@@ -137,7 +137,7 @@ def config_init(config):
     config
 
 if __name__ == "__main__":
-    configuration_path = 'configurations' + os.sep + 'exp5.yaml'
+    configuration_path = 'configurations' + os.sep + 'exp6.yaml'
     config = Config(configuration_path)
 
     print("config", config.config)
@@ -150,6 +150,7 @@ if __name__ == "__main__":
     data_manager = DataManager(config)
     if config.should_train_model:
         model = get_model(config, data_manager.data_dim)
+        print(model)
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.lr_step_size, gamma=config.lr_gamma)  # reduce the learning after 20 epochs by a factor of 10
         criterion = nn.MSELoss()

@@ -11,26 +11,42 @@ The goal will be to dynamically load configurations from yaml files. Until then,
 
 @dataclasses.dataclass
 class Config:
-    # DATA_DOWNLOAD_PATH = "../data/sc/"
-    # DATA_PATH = "../data/sc/SpeechCommands/speech_commands_v0.02"
-    # PICKLE_PATH = "../simple_pickles/"
-    # AUDIO_PATH = "../audio/"
-    # EXPERIMENTS_PATH = "../experiments/"
+    # DEFAULT VALUES; WILL BE OVERWRITTEN BY CONFIG FILE
+    DATA_DOWNLOAD_PATH = "../data/sc/"
+    DATA_PATH = "../data/sc/SpeechCommands/speech_commands_v0.02"
+    PICKLE_PATH = "../simple_pickles/"
+    AUDIO_PATH = "../audio/"
+    EXPERIMENTS_PATH = "../experiments/"
 
-    # should_repickle = False
-    # should_train_model = True
+    should_repickle = False
+    should_train_model = True
 
+    device = "cuda"
 
-    # log_interval = 10
+    log_interval = 100
 
-    # epochs = 2
-    # batch_size = 256
+    epochs = 1
+    batch_size = 256
+    lr = 0.1
+    lr_step_size = 10
+    lr_gamma = 0.1
+    weight_decay = 0.0001
 
-    # model_type = "linear_vae"
-    # latent_dim = 256
-    # hidden_dims = [1024, 512, 512]
+    model_type = "linear_vae"
+    latent_dim = 256
+    hidden_dims = [1024, 512, 512]
 
-    # experiment_name = "exp3"
+    channels = [4, 8, 12]
+    strides = None
+    kernel_sizes = None
+    paddings = None
+
+    nonlinearity = "relu"
+    batch_norm = True
+
+    debug = True
+
+    experiment_name = "default_exp"
 
     # n_mels = 80
     # mel_scale = "htk"
@@ -39,12 +55,12 @@ class Config:
     # win_length = 400
     # n_stft = n_fft // 2 + 1
 
-    # n_mels = 39
-    # mel_scale = "htk"
-    # n_fft = 400
-    # hop_length = None
-    # win_length = None
-    # n_stft = n_fft // 2 + 1
+    n_mels = 39
+    mel_scale = "htk"
+    n_fft = 400
+    hop_length = None
+    win_length = None
+    n_stft = n_fft // 2 + 1
 
     # EXPERIMENT_PATH = os.path.join(EXPERIMENTS_PATH, experiment_name)
     # TRAINED_MODEL_PATH = os.path.join(EXPERIMENT_PATH,'trained_simple_vae_model_' + str(epochs) + 'epochs.pth')
