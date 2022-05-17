@@ -129,8 +129,13 @@ def plot(rec_loss_over_epochs, kl_loss_over_epochs, config):
     plt.legend()
     plt.savefig(os.path.join(config.EXPERIMENT_PATH, "loss.png"))
 
-def config_init(config):
-    config
+def sample_test(model, config, data_manager):
+    model = model.eval().to(config.device)
+    with torch.no_grad():
+        sample_features = model.sample(1)
+    sample_wav = data_manager.inverse_transform(sample_features).to("cpu")
+    print(sample_wav.shape)
+    torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "sample.wav"), sample_wav.to("cpu")[0], data_manager.sample_rate)
 
 if __name__ == "__main__":
     configuration_path = 'configurations' + os.sep + 'exp8.yaml'
@@ -157,6 +162,8 @@ if __name__ == "__main__":
     print("trained model loaded")
 
     reconstruct_audio_test(model.to(config.device), config, data_manager.train_set, data_manager.transform, data_manager.inverse_transform)
+
+    sample_test(model, config, data_manager)
     
 
 

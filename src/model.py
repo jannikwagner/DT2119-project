@@ -335,7 +335,9 @@ class VariationalAutoencoder(nn.Module):
         return x_rec, kl
 
     def sample(self, n):
-        self.N.sample((n, self.latent_dim))
+        z_sample = self.N.sample((n, self.latent_dim))
+        x_sample = self.decoder(z_sample)
+        return x_sample
 
     def to(self, device, *args):
         old_device = self.N.loc.device
