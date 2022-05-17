@@ -11,7 +11,7 @@ device: "cuda"
 
 log_interval: 100
 
-dummy_data_length: 100
+dummy_data_length: -1
 
 epochs: 100
 batch_size: 2048
