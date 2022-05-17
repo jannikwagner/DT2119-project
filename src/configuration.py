@@ -64,6 +64,8 @@ class Config:
     win_length = None
     n_stft = n_fft // 2 + 1
 
+    transform_type = "mel_spectrogram"  # or "spectrogram"
+
     # EXPERIMENT_PATH = os.path.join(EXPERIMENTS_PATH, experiment_name)
     # TRAINED_MODEL_PATH = os.path.join(EXPERIMENT_PATH,'trained_simple_vae_model_' + str(epochs) + 'epochs.pth')
     # LABELS_PATH = os.path.join(PICKLE_PATH, 'labels.pickle')

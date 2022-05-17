@@ -4,8 +4,10 @@ import pickle
 import torch
 import torchaudio
 from torchaudio.datasets import SPEECHCOMMANDS
+import torch.nn as nn
 
 from configuration import Config
+
 
 
 ##############################################
@@ -82,6 +84,12 @@ class DataManager:  # needs modularization!
         self.transform_InverseMelScale = torchaudio.transforms.InverseMelScale(n_mels=config.n_mels, sample_rate=sample_rate, mel_scale=config.mel_scale, n_stft=config.n_stft)  # takes some time
         self.transform_MelSpectrogram = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_mels=config.n_mels, mel_scale=config.mel_scale, n_fft=config.n_fft, hop_length=config.hop_length, win_length=config.win_length)
 
+        if config.transform_type == "spectrogram":
+            self.transform = self.transform_Spectrogram
+            self.inverse_transform = self.transform_GriffinLim
+        elif config.transform_type == "mel_spectrogram":
+            self.transform = self.transform_MelSpectrogram
+            self.inverse_transform = nn.Sequential(self.transform_InverseMelScale, self.transform_GriffinLim)
         def tests(train_set):
             waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
             print(waveform, sample_rate, label, speaker_id, utterance_number)
@@ -111,7 +119,6 @@ class DataManager:  # needs modularization!
             print(reconstructed-reconstructed2)
             print(reconstructed-reconstructed3)
 
-        self.transform = self.transform_MelSpectrogram
         def get_data_dim(train_set, transform):
             waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
             transformed = transform(waveform)

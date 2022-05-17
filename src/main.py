@@ -97,27 +97,23 @@ def train(model, optimizer, scheduler, criterion, config, transform, train_loade
     return rec_loss_over_epochs, kl_loss_over_epochs
 
 # pass through model
-def reconstruct_audio_test(model, config, train_set, transform_MelSpectrogram, transform_InverseMelScale, transform_GriffinLim):
+def reconstruct_audio_test(model, config, train_set, transform, inverse_transform):
     waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
     waveform = waveform.to(config.device)[None, ...]
-    transform_MelSpectrogram, transform_InverseMelScale, transform_GriffinLim = transform_MelSpectrogram.to(config.device), transform_InverseMelScale.to(config.device), transform_GriffinLim.to(config.device)
-    transformed = transform_MelSpectrogram(waveform)
+    transform, inverse_transform = transform.to(config.device), inverse_transform.to(config.device)
+    transformed = transform(waveform)
     print("transformed")
     print(transformed)
     print(transformed.min(), transformed.max())
     model = model.eval()
     with torch.no_grad():
-        rec_melspec, _ = model(transformed)
-    print("rec_melspec")
-    print(rec_melspec)
-    print(rec_melspec.min(), rec_melspec.max())
+        rec_features, _ = model(transformed)
+    print("rec_features")
+    print(rec_features)
+    print(rec_features.min(), rec_features.max())
     print("diff")
-    print(transformed - rec_melspec)
-    rec_spec = transform_InverseMelScale(rec_melspec)
-    print("rec_spec")
-    print(rec_spec.shape)
-    print(rec_spec.min(), rec_spec.max())
-    rec_wav = transform_GriffinLim(rec_spec)
+    print(transformed - rec_features)
+    rec_wav = inverse_transform(rec_features)
     print("rec_wav")
     print(rec_wav.min(), rec_wav.max())
     print(rec_wav.shape)
@@ -137,7 +133,7 @@ def config_init(config):
     config
 
 if __name__ == "__main__":
-    configuration_path = 'configurations' + os.sep + 'exp7.yaml'
+    configuration_path = 'configurations' + os.sep + 'exp8.yaml'
     config = Config(configuration_path)
 
     print("config", config.config)
@@ -160,7 +156,7 @@ if __name__ == "__main__":
         model = torch.load(config.TRAINED_MODEL_PATH, map_location=config.device)
     print("trained model loaded")
 
-    reconstruct_audio_test(model.to(config.device), config, data_manager.train_set, data_manager.transform_MelSpectrogram, data_manager.transform_InverseMelScale, data_manager.transform_GriffinLim)
+    reconstruct_audio_test(model.to(config.device), config, data_manager.train_set, data_manager.transform, data_manager.inverse_transform)
     
 
 
