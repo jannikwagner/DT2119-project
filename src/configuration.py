@@ -25,6 +25,8 @@ class Config:
 
     log_interval = 100
 
+    dummy_data_length = -1
+
     epochs = 1
     batch_size = 256
     lr = 0.1

@@ -2,6 +2,7 @@ from pickletools import StackObject
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchaudio
 
 """
 Probably there should be different files for different models.
@@ -256,10 +257,12 @@ class TransposedConv2dStack(nn.Module):
         print(c, h, w)
 
         layers = []
-        for c2, k, s, p in zip(channels, kernel_sizes, strides, paddings):
-            if batch_norm:
-                layers.append(nn.BatchNorm2d(c))
-            layers.append(nonlinearity)
+        for i, (c2, k, s, p) in enumerate(zip(channels, kernel_sizes, strides, paddings)):
+            layers.append(nn.Upsample((h,w)))
+            if i!= 0:
+                if batch_norm:
+                    layers.append(nn.BatchNorm2d(c))
+                layers.append(nonlinearity)
             layers.append(nn.ConvTranspose2d(c2, c, k, s, p))
             c, h, w = update_chw(h, w, c2, p, k, s)
         

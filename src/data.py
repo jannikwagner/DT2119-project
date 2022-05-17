@@ -5,6 +5,8 @@ import torch
 import torchaudio
 from torchaudio.datasets import SPEECHCOMMANDS
 
+from configuration import Config
+
 
 ##############################################
 # LOADING THE DATA
@@ -29,9 +31,9 @@ class SubsetSC(SPEECHCOMMANDS):
             self._walker = self._walker[:num]
 
 class DataManager:  # needs modularization!
-    def __init__(self, config):
+    def __init__(self, config: Config):
         # Create training and testing split of the data. We do not use validation.
-        self.train_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "training")
+        self.train_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "training", config.dummy_data_length)
         print("trainset length", len(self.train_set))
         self.test_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "testing")
         print("SubsetSC loaded")
@@ -48,6 +50,7 @@ class DataManager:  # needs modularization!
             with open(config.LABELS_PATH, 'rb') as handle:
                 labels = pickle.load(handle)
             print("labels loaded")
+        print(labels)
 
         def make_speaker_dic(data_set):
             speakers = [speaker_id for _, _, _, speaker_id, _ in data_set]
