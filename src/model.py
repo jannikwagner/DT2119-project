@@ -302,10 +302,10 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, stack, latent_dim):
         super().__init__()
-        self.stack = stack
         dim = stack.dim
-
         self.fc = nn.Linear(latent_dim, dim)
+
+        self.stack = stack
         
     def forward(self, z):
         z = self.fc(z)
