@@ -11,8 +11,8 @@ channels:
 - 64
 - 128
 device: cuda
-dummy_data_length: -1
-epochs: 100
+dummy_data_length: 100
+epochs: 10
 experiment_name: exp11_1d_over_time
 hop_length: 256
 kernel_sizes:

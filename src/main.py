@@ -1,3 +1,4 @@
+from turtle import backward
 from tqdm import tqdm
 import torchaudio
 from torch import nn
@@ -108,8 +109,9 @@ def reconstruct_audio_test(model, config, train_set, transform, inverse_transfor
     print(transformed)
     print(transformed.min(), transformed.max())
     model = model.eval()
+    label_one_hot = data_manager.label_to_one_hot(label)[None, ...]
     with torch.no_grad():
-        rec_features, _ = model(transformed)
+        rec_features, _ = model(transformed, label_one_hot)
     print("rec_features")
     print(rec_features)
     print(rec_features.min(), rec_features.max())
@@ -132,17 +134,19 @@ def plot(rec_loss_over_epochs, kl_loss_over_epochs, config):
     plt.savefig(os.path.join(config.EXPERIMENT_PATH, "loss.png"))
     plt.cla()
 
-def sample_test(model, config, data_manager):
+def sample_test(model, config, data_manager, label="backward"):
     model = model.eval().to(config.device)
+    label_one_hot = data_manager.label_to_one_hot(label)[None, :]
     with torch.no_grad():
-        sample_features = model.sample(1)
+        sample_features = model.sample(1, label_one_hot)
     sample_wav = data_manager.inverse_transform(sample_features).to("cpu")
     print(sample_wav.shape)
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "sample.wav"), sample_wav.to("cpu")[0], data_manager.sample_rate)
 
 if __name__ == "__main__":
-    experiments = ['exp11.yaml','exp12.yaml','exp13.yaml']
+    experiments = ['exp11.yaml']
     for experiment in experiments:
+        print(experiment)
         configuration_path = 'configurations' + os.sep + experiment
         config = Config(configuration_path)
 

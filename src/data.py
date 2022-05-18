@@ -144,12 +144,6 @@ class DataManager:  # needs modularization!
             batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True, padding_value=0.)
             return batch.permute(0, 2, 1)
         
-        def get_one_hot(val, length):
-            arr = torch.zeros(length)
-            arr[val] = 1
-            # self.print_if_print_info(arr)
-            return arr
-
         def collate_fn(batch):
 
             # A data tuple has the form:
@@ -161,12 +155,9 @@ class DataManager:  # needs modularization!
             for waveform, _, label, speaker_id,*_ in batch:
                 tensors += [waveform]
                 # self.print_if_print_info(label)
-                label_idx = self.label_dic[label]
+                label_idx = self.label_to_one_hot(label)
                 # self.print_if_print_info(label_idx)
-                label_idx = get_one_hot(label_idx, len(self.labels))
-                # self.print_if_print_info(label_idx)
-                speaker_idx = self.speaker_dic[speaker_id]
-                speaker_idx = get_one_hot(speaker_idx, len(self.speakers))
+                speaker_idx = self.speaker_to_one_hot(speaker_id)
                 labels += [label_idx]
                 speaker_ids += [speaker_idx]
 
@@ -205,3 +196,20 @@ class DataManager:  # needs modularization!
     def print_if_print_info(self, *arg):
         if self.print_info:
             print(*arg)
+    
+    def get_one_hot(self, val, length):
+        arr = torch.zeros(length)
+        arr[val] = 1
+        # self.print_if_print_info(arr)
+        return arr
+
+    def label_to_one_hot(self, label):
+        label_idx = self.label_dic[label]
+        # self.print_if_print_info(label_idx)
+        label_idx = self.get_one_hot(label_idx, len(self.labels))
+        return label_idx
+    
+    def speaker_to_one_hot(self, speaker_id):
+        speaker_idx = self.speaker_dic[speaker_id]
+        speaker_idx = self.get_one_hot(speaker_idx, len(self.speakers))
+        return speaker_idx

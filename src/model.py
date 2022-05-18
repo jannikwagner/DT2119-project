@@ -304,8 +304,10 @@ class Encoder(nn.Module):
         x = self.stack(x)
         
         if self.condition_enc and condition is not None:
+            # print("enc", x.shape)
             x = torch.concat([x, condition], 1)
-            
+            # print("enc", x.shape)
+
         z_mu = self.fc_z_mu(x)
         z_log_var = F.tanh(self.fc_z_log_var(x))
         return z_mu, z_log_var
@@ -322,7 +324,9 @@ class Decoder(nn.Module):
         
     def forward(self, z, condition=None):
         if self.condition_dec and condition is not None:
+            # print("dec", z.shape)
             z = torch.concat([z, condition], 1)
+            # print("dec", z.shape)
 
         z = self.fc(z)
         x_rec = self.stack(z)
@@ -349,9 +353,9 @@ class VariationalAutoencoder(nn.Module):
         x_rec = self.decoder(z, condition)
         return x_rec, kl
 
-    def sample(self, n):
+    def sample(self, n, condition=None):
         z_sample = self.N.sample((n, self.latent_dim))
-        x_sample = self.decoder(z_sample)
+        x_sample = self.decoder(z_sample, condition)
         return x_sample
 
     def to(self, device, *args):
@@ -367,7 +371,7 @@ class VariationalAutoencoder(nn.Module):
 def conv2d_builder(data_dim, latent_dim, device, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True, condition_dec=False, condition_enc=False, condition_dim=0):
     encoder_stack = Conv2dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)
     decoder_stack = TransposedConv2dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)
-    encoder = Encoder(encoder_stack, latent_dim, condition_dim, condition_enc)
-    decoder = Decoder(decoder_stack, latent_dim, condition_dim, condition_dec)
+    encoder = Encoder(encoder_stack, latent_dim, condition_enc, condition_dim)
+    decoder = Decoder(decoder_stack, latent_dim, condition_dec, condition_dim)
     vae = VariationalAutoencoder(encoder, decoder, latent_dim, device)
     return vae
