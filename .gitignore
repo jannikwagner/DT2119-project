@@ -130,3 +130,7 @@ dmypy.json
 
 data/
 audio/
+experiments/
+pickles/
+simple_pickles/
+fig/
