@@ -32,13 +32,16 @@ class SubsetSC(SPEECHCOMMANDS):
             self._walker = [w for w in self._walker if w not in excludes]
             self._walker = self._walker[:num]
 
+
+
 class DataManager:  # needs modularization!
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, print_info=True):
+        self.print_info = print_info
         # Create training and testing split of the data. We do not use validation.
         self.train_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "training", config.dummy_data_length)
-        print("trainset length", len(self.train_set))
+        self.print_if_print_info("trainset length", len(self.train_set))
         self.test_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "testing")
-        print("SubsetSC loaded")
+        self.print_if_print_info("SubsetSC loaded")
 
         waveform, sample_rate, label, speaker_id, utterance_number = self.train_set[0]
         self.sample_rate = sample_rate
@@ -47,13 +50,13 @@ class DataManager:  # needs modularization!
             self.labels = sorted(list(set(datapoint[2] for datapoint in self.train_set)))
             with open(config.LABELS_PATH, 'wb') as handle:
                 pickle.dump(self.labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            print("labels saved")  
+            self.print_if_print_info("labels saved")  
         else:
             with open(config.LABELS_PATH, 'rb') as handle:
                 self.labels = pickle.load(handle)
-            print("labels loaded")
-        print(self.labels)
-        print("num labels", len(self.labels))
+            self.print_if_print_info("labels loaded")
+        self.print_if_print_info(self.labels)
+        self.print_if_print_info("num labels", len(self.labels))
         self.n_labels = len(self.labels)
         self.label_dic = {label: i for i, label in enumerate(self.labels)}
 
@@ -68,13 +71,13 @@ class DataManager:  # needs modularization!
             self.speaker_dic = make_speaker_dic(self.train_set)
             with open(config.SPEAKER_DICT_PATH, 'wb') as handle:
                 pickle.dump(self.speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            print("speaker_dic saved")  
+            self.print_if_print_info("speaker_dic saved")  
         else:
             with open(config.SPEAKER_DICT_PATH, 'rb') as handle:
                 self.speaker_dic = pickle.load(handle)
-            print("speaker dictionary loaded")
+            self.print_if_print_info("speaker dictionary loaded")
         self.speakers = list(self.speaker_dic)
-        print("num spekaers", len(self.speakers))
+        self.print_if_print_info("num speakers", len(self.speakers))
         self.n_speakers = len(self.speakers)
 
         ##############################################
@@ -98,32 +101,32 @@ class DataManager:  # needs modularization!
             self.inverse_transform = nn.Sequential(self.transform_InverseMelScale, self.transform_GriffinLim)
         def tests(train_set):
             waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
-            print(waveform, sample_rate, label, speaker_id, utterance_number)
-            print(waveform.min(), waveform.max())
+            self.print_if_print_info(waveform, sample_rate, label, speaker_id, utterance_number)
+            self.print_if_print_info(waveform.min(), waveform.max())
             spectrogram = self.transform_Spectrogram(waveform)
-            print("spectrogram shape:", spectrogram.shape)
+            self.print_if_print_info("spectrogram shape:", spectrogram.shape)
             spectrogram_complex = self.transform_SpectrogramComplex(waveform)
-            print("spectrogram_complex shape:", spectrogram_complex.shape)
+            self.print_if_print_info("spectrogram_complex shape:", spectrogram_complex.shape)
             mel_spectrogram = self.transform_MelSpectrogram(waveform)
-            print("mel_spectrogram shape:", mel_spectrogram.shape)
+            self.print_if_print_info("mel_spectrogram shape:", mel_spectrogram.shape)
             mel_spectrogram2 = self.transform_MelScale(spectrogram)
-            print("mel_spectrogram2 shape:", mel_spectrogram2.shape)
+            self.print_if_print_info("mel_spectrogram2 shape:", mel_spectrogram2.shape)
             reconstructed_spectrogram = self.transform_InverseMelScale(mel_spectrogram)
-            print("reconstructed_spectrogram shape:", reconstructed_spectrogram.shape)
+            self.print_if_print_info("reconstructed_spectrogram shape:", reconstructed_spectrogram.shape)
             reconstructed_spectrogram2 = self.transform_InverseMelScale(mel_spectrogram2)
-            print("reconstructed_spectrogram2 shape:", reconstructed_spectrogram2.shape)
+            self.print_if_print_info("reconstructed_spectrogram2 shape:", reconstructed_spectrogram2.shape)
             reconstructed = self.transform_GriffinLim(spectrogram)
-            print("reconstructed shape:", reconstructed.shape)
+            self.print_if_print_info("reconstructed shape:", reconstructed.shape)
             reconstructed2 = self.transform_InverseSpectrogram(spectrogram_complex)
-            print("reconstructed2 shape:", reconstructed2.shape)
+            self.print_if_print_info("reconstructed2 shape:", reconstructed2.shape)
             reconstructed3 = self.transform_GriffinLim(reconstructed_spectrogram)
-            print("reconstructed3 shape:", reconstructed3.shape)
+            self.print_if_print_info("reconstructed3 shape:", reconstructed3.shape)
             torchaudio.save(config.AUDIO_PATH+"reconstructed.wav", reconstructed, sample_rate)  # sounds bad
             torchaudio.save(config.AUDIO_PATH+"reconstructed2.wav", reconstructed2, sample_rate)  # sounds good
             torchaudio.save(config.AUDIO_PATH+"reconstructed3.wav", reconstructed3, sample_rate)  # sounds bad
             torchaudio.save(config.AUDIO_PATH+"original.wav", waveform, sample_rate)
-            print(reconstructed-reconstructed2)
-            print(reconstructed-reconstructed3)
+            self.print_if_print_info(reconstructed-reconstructed2)
+            self.print_if_print_info(reconstructed-reconstructed3)
 
         def get_data_dim(train_set, transform):
             waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
@@ -143,7 +146,7 @@ class DataManager:  # needs modularization!
         def get_one_hot(val, length):
             arr = torch.zeros(length)
             arr[val] = 1
-            # print(arr)
+            # self.print_if_print_info(arr)
             return arr
 
         def collate_fn(batch):
@@ -156,11 +159,11 @@ class DataManager:  # needs modularization!
             # Gather in lists, and encode labels as indices
             for waveform, _, label, speaker_id,*_ in batch:
                 tensors += [waveform]
-                # print(label)
+                # self.print_if_print_info(label)
                 label_idx = self.label_dic[label]
-                # print(label_idx)
+                # self.print_if_print_info(label_idx)
                 label_idx = get_one_hot(label_idx, len(self.labels))
-                # print(label_idx)
+                # self.print_if_print_info(label_idx)
                 speaker_idx = self.speaker_dic[speaker_id]
                 speaker_idx = get_one_hot(speaker_idx, len(self.speakers))
                 labels += [label_idx]
@@ -197,3 +200,7 @@ class DataManager:  # needs modularization!
             num_workers=num_workers,
             pin_memory=pin_memory,
         )
+
+    def print_if_print_info(self, *arg):
+        if self.print_info:
+            print(*arg)
