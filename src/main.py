@@ -140,32 +140,34 @@ def sample_test(model, config, data_manager):
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "sample.wav"), sample_wav.to("cpu")[0], data_manager.sample_rate)
 
 if __name__ == "__main__":
-    configuration_path = 'configurations' + os.sep + 'exp12.yaml'
-    config = Config(configuration_path)
+    experiments = ['exp11.yaml','exp12.yaml','exp13.yaml']
+    for experiment in experiments:
+        configuration_path = 'configurations' + os.sep + experiment
+        config = Config(configuration_path)
 
-    print("config", config.config)
-    print("device:", config.device)
-    os.makedirs(config.DATA_DOWNLOAD_PATH, exist_ok=True)
-    os.makedirs(config.AUDIO_PATH, exist_ok=True)
-    os.makedirs(config.EXPERIMENT_PATH, exist_ok=True)
+        print("config", config.config)
+        print("device:", config.device)
+        os.makedirs(config.DATA_DOWNLOAD_PATH, exist_ok=True)
+        os.makedirs(config.AUDIO_PATH, exist_ok=True)
+        os.makedirs(config.EXPERIMENT_PATH, exist_ok=True)
 
-    # The transform needs to live on the same device as the model and the data.
-    data_manager = DataManager(config)
-    if config.should_train_model:
-        model = get_model(config, data_manager.data_dim)
-        print(model)
-        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.lr_step_size, gamma=config.lr_gamma)  # reduce the learning after 20 epochs by a factor of 10
-        criterion = nn.MSELoss()
-        rec_loss_over_epochs, kl_loss_over_epochs = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
-        plot(rec_loss_over_epochs, kl_loss_over_epochs, config)   
-    else:
-        model = torch.load(config.TRAINED_MODEL_PATH, map_location=config.device)
-    print("trained model loaded")
+        # The transform needs to live on the same device as the model and the data.
+        data_manager = DataManager(config)
+        if config.should_train_model:
+            model = get_model(config, data_manager.data_dim)
+            print(model)
+            optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.lr_step_size, gamma=config.lr_gamma)  # reduce the learning after 20 epochs by a factor of 10
+            criterion = nn.MSELoss()
+            rec_loss_over_epochs, kl_loss_over_epochs = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
+            plot(rec_loss_over_epochs, kl_loss_over_epochs, config)   
+        else:
+            model = torch.load(config.TRAINED_MODEL_PATH, map_location=config.device)
+        print("trained model loaded")
 
-    reconstruct_audio_test(model.to(config.device), config, data_manager.train_set, data_manager.transform, data_manager.inverse_transform)
+        reconstruct_audio_test(model.to(config.device), config, data_manager.train_set, data_manager.transform, data_manager.inverse_transform)
 
-    sample_test(model, config, data_manager)
+        sample_test(model, config, data_manager)
     
 
 

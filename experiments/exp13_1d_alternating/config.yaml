@@ -6,15 +6,15 @@ PICKLE_PATH: ../simple_pickles/
 batch_norm: true
 batch_size: 256
 channels:
+- 4
+- 8
 - 16
 - 32
 - 64
-- 128
-- 256
 device: cuda
 dummy_data_length: -1
 epochs: 100
-experiment_name: exp10_simple
+experiment_name: exp13_1d_alternating
 hop_length: 256
 kernel_sizes:
 - - 1
