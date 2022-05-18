@@ -44,15 +44,16 @@ class DataManager:  # needs modularization!
         self.sample_rate = sample_rate
 
         if config.should_repickle:
-            labels = sorted(list(set(datapoint[2] for datapoint in self.train_set)))
+            self.labels = sorted(list(set(datapoint[2] for datapoint in self.train_set)))
             with open(config.LABELS_PATH, 'wb') as handle:
-                pickle.dump(labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
             print("labels saved")  
         else:
             with open(config.LABELS_PATH, 'rb') as handle:
-                labels = pickle.load(handle)
+                self.labels = pickle.load(handle)
             print("labels loaded")
-        print(labels)
+        print(self.labels)
+        self.label_dic = {label: i for i, label in enumerate(self.labels)}
 
         def make_speaker_dic(data_set):
             speakers = [speaker_id for _, _, _, speaker_id, _ in data_set]
@@ -62,14 +63,15 @@ class DataManager:  # needs modularization!
             return speaker_dic
 
         if config.should_repickle: 
-            speaker_dic = make_speaker_dic(self.train_set)
+            self.speaker_dic = make_speaker_dic(self.train_set)
             with open(config.SPEAKER_DICT_PATH, 'wb') as handle:
-                pickle.dump(speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
             print("speaker_dic saved")  
         else:
             with open(config.SPEAKER_DICT_PATH, 'rb') as handle:
-                speaker_dic = pickle.load(handle)
+                self.speaker_dic = pickle.load(handle)
             print("speaker dictionary loaded")
+        self.speakers = list(self.speaker_dic)
 
         ##############################################
         # FORMATTING THE DATA
@@ -128,43 +130,44 @@ class DataManager:  # needs modularization!
         # new_sample_rate = 8000
         # transform = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=new_sample_rate)
 
-
-        def label_to_index(word):
-            # Return the position of the word in labels
-            return torch.tensor(labels.index(word))
-
-
-        def index_to_label(index):
-            # Return the word corresponding to the index in labels
-            # This is the inverse of label_to_index
-            print("index", index)
-            return labels[index]
-
         def pad_sequence(batch):
             # Make all tensor in a batch the same length by padding with zeros
             batch = [item.t() for item in batch]
             batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True, padding_value=0.)
             return batch.permute(0, 2, 1)
+        
+        def get_one_hot(val, length):
+            arr = torch.zeros(length)
+            arr[val] = 1
+            # print(arr)
+            return arr
 
         def collate_fn(batch):
 
             # A data tuple has the form:
             # waveform, sample_rate, label, speaker_id, utterance_number
 
-            tensors, targets, speaker_ids = [], [], []
+            tensors, labels, speaker_ids = [], [], []
 
             # Gather in lists, and encode labels as indices
             for waveform, _, label, speaker_id,*_ in batch:
                 tensors += [waveform]
-                targets += [label_to_index(label)]
-                speaker_ids += [speaker_dic[speaker_id]]
+                # print(label)
+                label_idx = self.label_dic[label]
+                # print(label_idx)
+                label_idx = get_one_hot(label_idx, len(self.labels))
+                # print(label_idx)
+                speaker_idx = self.speaker_dic[speaker_id]
+                speaker_idx = get_one_hot(speaker_idx, len(self.speakers))
+                labels += [label_idx]
+                speaker_ids += [speaker_idx]
 
             # Group the list of tensors into a batched tensor
             tensors = pad_sequence(tensors)
-            targets = torch.stack(targets)
-            speaker_ids = torch.Tensor(speaker_ids)[:, None]
+            labels = torch.stack(labels)
+            speaker_ids = torch.stack(speaker_ids)
 
-            return tensors, targets, speaker_ids
+            return tensors, labels, speaker_ids
 
         if config.device == "cuda":
             num_workers = 1

@@ -33,6 +33,8 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         audio = audio.to(config.device)  # batch_size, n_channels, n_samples
         label = label.to(config.device)
         speaker_id = speaker_id.to(config.device)
+        # print(label.shape, speaker_id.shape)
+        # print(label, speaker_id)
         mel_spectrogram = transform(audio)  # batch_size, n_channels, n_mel, n_windows
         optimizer.zero_grad()
         
