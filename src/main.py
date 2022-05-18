@@ -38,7 +38,7 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         mel_spectrogram = transform(audio)  # batch_size, n_channels, n_mel, n_windows
         optimizer.zero_grad()
         
-        rec_mel_spectrogram, kl = model(mel_spectrogram)  # 
+        rec_mel_spectrogram, kl = model(mel_spectrogram, label)  # 
 
         rec_loss = criterion(rec_mel_spectrogram, mel_spectrogram)
         loss = rec_loss + kl
@@ -130,6 +130,7 @@ def plot(rec_loss_over_epochs, kl_loss_over_epochs, config):
     plt.ylabel("loss")
     plt.legend()
     plt.savefig(os.path.join(config.EXPERIMENT_PATH, "loss.png"))
+    plt.cla()
 
 def sample_test(model, config, data_manager):
     model = model.eval().to(config.device)
@@ -154,7 +155,7 @@ if __name__ == "__main__":
         # The transform needs to live on the same device as the model and the data.
         data_manager = DataManager(config)
         if config.should_train_model:
-            model = get_model(config, data_manager.data_dim)
+            model = get_model(config, data_manager.data_dim, data_manager.condition_dim)
             print(model)
             optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.lr_step_size, gamma=config.lr_gamma)  # reduce the learning after 20 epochs by a factor of 10

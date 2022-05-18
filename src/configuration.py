@@ -38,6 +38,9 @@ class Config:
     latent_dim = 256
     hidden_dims = [1024, 512, 512]
 
+    condition_dec = True
+    condition_enc = True
+
     channels = [4, 8, 12]
     strides = None
     kernel_sizes = None

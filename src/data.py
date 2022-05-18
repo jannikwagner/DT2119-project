@@ -58,6 +58,7 @@ class DataManager:  # needs modularization!
         self.print_if_print_info(self.labels)
         self.print_if_print_info("num labels", len(self.labels))
         self.n_labels = len(self.labels)
+        self.condition_dim = self.n_labels
         self.label_dic = {label: i for i, label in enumerate(self.labels)}
 
         def make_speaker_dic(data_set):
