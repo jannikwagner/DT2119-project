@@ -140,7 +140,7 @@ def sample_test(model, config, data_manager):
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "sample.wav"), sample_wav.to("cpu")[0], data_manager.sample_rate)
 
 if __name__ == "__main__":
-    configuration_path = 'configurations' + os.sep + 'exp8.yaml'
+    configuration_path = 'configurations' + os.sep + 'exp10.yaml'
     config = Config(configuration_path)
 
     print("config", config.config)

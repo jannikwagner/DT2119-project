@@ -53,6 +53,8 @@ class DataManager:  # needs modularization!
                 self.labels = pickle.load(handle)
             print("labels loaded")
         print(self.labels)
+        print("num labels", len(self.labels))
+        self.n_labels = len(self.labels)
         self.label_dic = {label: i for i, label in enumerate(self.labels)}
 
         def make_speaker_dic(data_set):
@@ -72,6 +74,8 @@ class DataManager:  # needs modularization!
                 self.speaker_dic = pickle.load(handle)
             print("speaker dictionary loaded")
         self.speakers = list(self.speaker_dic)
+        print("num spekaers", len(self.speakers))
+        self.n_speakers = len(self.speakers)
 
         ##############################################
         # FORMATTING THE DATA

@@ -208,11 +208,18 @@ NONLINEARITIES = {
     "tanh" : nn.Tanh(),
     None : nn.Identity()
 }
-
+def split_list(x):
+    # print(type(x), isinstance(x, list))
+    x_h, x_w = x if isinstance(x, (list, tuple)) else (x, x)
+    # print(x_h, x_w)
+    return x_h, x_w
 def update_h(h, p, k, s):
     return (h+2*p-(k-1)-1) // s + 1
 def update_chw(h, w, c2, p, k, s):
-    return c2, update_h(h, p, k, s), update_h(w, p, k, s)
+    p_h, p_w = split_list(p)
+    k_h, k_w = split_list(k)
+    s_h, s_w = split_list(s)
+    return c2, update_h(h, p_h, k_h, s_h), update_h(w, p_w, k_w, s_w)
 
 class Conv2dStack(nn.Module):
     def __init__(self, data_dim, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True):
