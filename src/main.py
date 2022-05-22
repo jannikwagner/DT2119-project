@@ -27,8 +27,9 @@ import time
 def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
     model = model.train()
     t = time.time()
-    total_rec_loss = 0
-    total_kl_loss = 0
+    rec_losses = []
+    kl_losses = []
+    clazz_losses = []
 
     for batch_idx, (audio, label, speaker_id) in enumerate(dataloader):
         audio = audio.to(config.device)  # batch_size, n_channels, n_samples
@@ -41,7 +42,7 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         
         rec_mel_spectrogram, kl, *clazz = model(mel_spectrogram, label)  # 
 
-        classify_loss = 0
+        classify_loss = torch.as_tensor(0)
         if config.classify:
             clazz = clazz[0]
             classify_loss = F.binary_cross_entropy(clazz, label)
@@ -55,13 +56,13 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         loss.backward()
         optimizer.step()
 
-        batchsize = audio.size()[0]
-        total_rec_loss += rec_loss.detach().cpu().numpy().sum()
-        total_kl_loss += kl.detach().cpu().numpy().sum()
+        rec_losses.append(rec_loss.item())
+        kl_losses.append(kl.item())
+        clazz_losses.append(classify_loss.item())
 
         if (batch_idx) % config.log_interval == 0:  
-            print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.detach().cpu().numpy().sum()/batchsize:.5f}, kl: {kl.detach().cpu().numpy().sum()/batchsize:.5f}, classify_loss: {classify_loss:.5f}, time {time.time()-t:.5f}")
-    return total_rec_loss/len(dataloader), total_kl_loss/len(dataloader)
+            print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.item():.5f}, kl: {kl.item():.5f}, classify_loss: {classify_loss.item():.5f}, time {time.time()-t:.5f}")
+    return rec_losses, kl_losses, clazz_losses
 
 def number_of_correct(pred, target):
     # count number of correct predictions
@@ -91,22 +92,24 @@ def test_one_epoch(model, epoch, test_loader, transform, speaker_dic):  # curren
     print(f"\nTest Epoch: {epoch}\tAccuracy: {correct}/{len(test_loader.dataset)} ({100. * correct / len(test_loader.dataset):.0f}%)\n")
 
 def train(model, optimizer, scheduler, criterion, config, transform, train_loader):
-    rec_loss_over_epochs = []
-    kl_loss_over_epochs = []
+    total_rec_losses = []
+    total_kl_losses = []
+    total_clazz_losses = []
     transform = transform.to(config.device)
     for epoch in tqdm(range(1, config.epochs + 1)):
-        rec_loss, kl_loss = train_one_epoch(model, train_loader, optimizer, transform, config, criterion)
-        print(f"--> epoch: {epoch}, rec_loss: {rec_loss:.5f}, kl: {kl_loss:.5f}")
-        if np.isnan(rec_loss) or np.isnan(kl_loss):
+        rec_losses, kl_losses, clazz_losses = train_one_epoch(model, train_loader, optimizer, transform, config, criterion)
+        print(f"--> epoch: {epoch}, rec_loss: {np.mean(rec_losses):.5f}, kl: {np.mean(kl_losses):.5f}, clazz: {np.mean(clazz_losses):.5f}")
+        if any(map(lambda x : np.any(np.isnan(x)), [rec_losses, kl_losses, clazz_losses])):
             print("LOSS IS NAN, interrupting")
             break
 
-        rec_loss_over_epochs.append(rec_loss)
-        kl_loss_over_epochs.append(kl_loss)
+        total_rec_losses.extend(rec_losses)
+        total_kl_losses.extend(kl_losses)
+        total_clazz_losses.extend(clazz_losses)
         # test(model, epoch)
         scheduler.step()
         torch.save(model, config.TRAINED_MODEL_PATH)  # save every epoch in case of failure (TODO: should save he cpu version so that it can be loaded from cpu)
-    return rec_loss_over_epochs, kl_loss_over_epochs
+    return total_rec_losses, total_kl_losses, total_clazz_losses
 
 # pass through model
 def reconstruct_audio_test(model, config, train_set, transform, inverse_transform):
@@ -153,11 +156,12 @@ def reconstruct_normed_audio_test(config, train_set, transform, inverse_transfor
     torchaudio.save(os.path.join(config.AUDIO_PATH, "rec_norm.wav"), rec_norm_wav.to("cpu")[0], sample_rate)
     torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), waveform.to("cpu")[0], sample_rate)
 
-def plot(rec_loss_over_epochs, kl_loss_over_epochs, config):
-    n = len(rec_loss_over_epochs)
-    plt.plot(range(n), rec_loss_over_epochs, label="rec_loss")
-    plt.plot(range(n), kl_loss_over_epochs, label="kl_loss")
-    plt.xlabel("epoch")
+def plot(total_rec_losses, total_kl_losses, total_clazz_losses, config):
+    n = len(total_rec_losses)
+    plt.plot(range(n), total_rec_losses, label="rec_loss")
+    plt.plot(range(n), total_kl_losses, label="kl_loss")
+    plt.plot(range(n), total_clazz_losses, label="clazz_loss")
+    plt.xlabel("updates")
     plt.ylabel("loss")
     plt.legend()
     plt.savefig(os.path.join(config.EXPERIMENT_PATH, "loss.png"))
@@ -190,12 +194,14 @@ if __name__ == "__main__":
 
         if config.should_train_model:
             model = get_model(config, data_manager.data_dim, data_manager.condition_dim, data_manager.n_labels)
+            pytorch_total_params = sum(p.numel() for p in model.parameters())
             print(model)
+            print("params:", pytorch_total_params)
             optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.lr_step_size, gamma=config.lr_gamma)  # reduce the learning after 20 epochs by a factor of 10
             criterion = nn.MSELoss()
-            rec_loss_over_epochs, kl_loss_over_epochs = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
-            plot(rec_loss_over_epochs, kl_loss_over_epochs, config)   
+            total_rec_losses, total_kl_losses, total_clazz_losses = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
+            plot(total_rec_losses, total_kl_losses, total_clazz_losses, config)   
         else:
             model = torch.load(config.TRAINED_MODEL_PATH, map_location=config.device)
         print("trained model loaded")

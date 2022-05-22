@@ -33,7 +33,7 @@ class Config:
     lr_step_size = 10
     lr_gamma = 0.1
     weight_decay = 0.0001
-    sqrt_for_loss = True
+    sqrt_for_loss = False
 
     model_type = "linear_vae"
     latent_dim = 256
