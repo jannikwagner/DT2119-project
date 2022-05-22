@@ -124,7 +124,7 @@ def reconstruct_audio_test(model, config, train_set, transform, inverse_transfor
     # print(transformed)
     # print(transformed.min(), transformed.max())
     model = model.eval()
-    label_one_hot = data_manager.label_to_one_hot(label)[None, ...]
+    label_one_hot = data_manager.label_to_one_hot(label)[None, ...].to(config.device)
     with torch.no_grad():
         rec_features, *_ = model(transformed, label_one_hot)
     # print("rec_features")
@@ -173,7 +173,7 @@ def plot(total_rec_losses, total_kl_losses, total_clazz_losses, config):
 def sample_test(model, config, data_manager, label="backward"):
     print("sample")
     model = model.eval().to(config.device)
-    label_one_hot = data_manager.label_to_one_hot(label)[None, :]
+    label_one_hot = data_manager.label_to_one_hot(label)[None, :].to(config.device)
     with torch.no_grad():
         sample_features = model.sample(1, label_one_hot)
     sample_wav = data_manager.inverse_transform(sample_features).to("cpu")
@@ -187,11 +187,13 @@ def get_acc(clazz, label):
     return acc
 
 def classify(model, data_loader):
-    model.eval()
+    model = model.eval().to(config.device)
     with torch.no_grad():
         total_loss = 0
         total_acc = 0
         for batch_idx, (audio, label, speaker_id) in enumerate(data_loader):
+            audio = audio.to(config.device)
+            label = label.to(config.device)
             features = data_manager.transform(audio)
             clazz = model.classify(features)
             loss = F.cross_entropy(clazz, label)

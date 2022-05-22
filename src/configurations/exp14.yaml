@@ -5,7 +5,7 @@ AUDIO_PATH: "../audio/"
 EXPERIMENTS_PATH: "../experiments/"
 
 should_repickle: False
-should_train_model: True
+should_train_model: False
 
 device: "cuda"
 
