@@ -116,7 +116,7 @@ def train(model, optimizer, scheduler, criterion, config, transform, train_loade
 # pass through model
 def reconstruct_audio_test(model, config, train_set, transform, inverse_transform):
     print("reconstruct test")
-    waveform, sample_rate, label, speaker_id, utterance_number = train_set[random.randint(0,100)]
+    waveform, sample_rate, label, speaker_id, utterance_number = train_set[random.randint(0,data_manager.n_labels-1)]
     waveform = waveform.to(config.device)[None, ...]
     transform, inverse_transform = transform.to(config.device), inverse_transform.to(config.device)
     transformed = transform(waveform)
@@ -170,10 +170,10 @@ def plot(total_rec_losses, total_kl_losses, total_clazz_losses, config):
     plt.savefig(os.path.join(config.EXPERIMENT_PATH, "loss.png"))
     plt.cla()
 
-def sample_test(model, config, data_manager, label="backward"):
+def sample_test(model, config, data_manager):
     print("sample")
     model = model.eval().to(config.device)
-    label_one_hot = data_manager.label_to_one_hot(label)[None, :].to(config.device)
+    label_one_hot = data_manager.get_one_hot(random.randint(0, data_manager.n_labels-1), data_manager.n_labels)[None,...].to(config.device)
     with torch.no_grad():
         sample_features = model.sample(1, label_one_hot)
     sample_wav = data_manager.inverse_transform(sample_features).to("cpu")
@@ -205,7 +205,7 @@ def classify(model, data_loader):
     return loss, acc
 
 if __name__ == "__main__":
-    experiments = ['exp14.yaml', "exp15.yaml", ]
+    experiments = ['exp19.yaml', "exp18.yaml", "exp17.yaml", "exp16.yaml", ]
     for experiment in experiments:
         print(experiment)
         configuration_path = 'configurations' + os.sep + experiment

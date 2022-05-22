@@ -16,7 +16,12 @@ def get_model(config, data_dim, condition_dim, num_labels):
         model = LinearVariationalAutoencoder(data_dim, config.latent_dim, config.hidden_dims, config.device)
 
     elif config.model_type == "conv2d_vae":
-        model = conv2d_builder(data_dim, config.latent_dim, config.device, config.channels, config.strides, config.kernel_sizes, config.paddings, config.nonlinearity, config.batch_norm, config.condition_dec, config.condition_enc, condition_dim, config.classify, num_labels)
+        model = conv2d_builder(data_dim, config.latent_dim, config.device, config.channels, config.strides, config.kernel_sizes,
+            config.paddings, config.nonlinearity, config.batch_norm, config.condition_dec, config.condition_enc, condition_dim, config.classify, num_labels)
+    
+    elif config.model_type == "conv1d_vae":
+        model = conv1d_builder(data_dim, config.latent_dim, config.device, config.channels, config.strides, config.kernel_sizes,
+            config.paddings, config.nonlinearity, config.batch_norm, config.condition_dec, config.condition_enc, condition_dim, config.classify, num_labels)
     return model.to(config.device)
 
 
@@ -288,6 +293,75 @@ class TransposedConv2dStack(nn.Module):
         x = self.seq(x)
         return x
 
+class Conv1dStack(nn.Module):
+    def __init__(self, data_dim, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True):
+        super().__init__()
+        if strides is None: strides = [1] * len(channels)
+        if kernel_sizes is None: kernel_sizes = [3] * len(channels)
+        if paddings is None: paddings = [0] * len(channels)
+        nonlinearity = NONLINEARITIES[nonlinearity]
+        *_, c, t = data_dim
+        print(c,t)
+
+        layers = []
+        for c2, k, s, p in zip(channels, kernel_sizes, strides, paddings):
+            layers.append(nn.Conv1d(c, c2, k, s, p))
+            layers.append(nonlinearity)
+            if batch_norm:
+                layers.append(nn.BatchNorm1d(c2))
+            c, t = c2, update_h(t, p, k, s)
+            print(c, t)
+        
+        layers.append(nn.Flatten())
+
+        self.layers = layers
+        self.seq = nn.Sequential(*layers)
+
+        self.dim = torch.prod(torch.as_tensor([c,t]))
+    def forward(self, x):
+        x = x.flatten(1,2)
+        # for l in self.layers:
+        #     x = l(x)
+        #     print(x.shape)
+        x = self.seq(x)
+        return x
+
+class TransposedConv1dStack(nn.Module):
+    def __init__(self, data_dim, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True):
+        super().__init__()
+        if strides is None: strides = [1] * len(channels)
+        if kernel_sizes is None: kernel_sizes = [3] * len(channels)
+        if paddings is None: paddings = [0] * len(channels)
+        nonlinearity = NONLINEARITIES[nonlinearity]
+        *_, c, t = data_dim
+        print(c,t)
+
+        layers = []
+        for i, (c2, k, s, p) in enumerate(zip(channels, kernel_sizes, strides, paddings)):
+            layers.append(nn.Upsample((t,)))
+            if i!= 0:
+                if batch_norm:
+                    layers.append(nn.BatchNorm1d(c))
+                layers.append(nonlinearity)
+            layers.append(nn.ConvTranspose1d(c2, c, k, s, p))
+            c, t = c2, update_h(t, p, k, s)
+        
+        layers.append(nn.Unflatten(1, (c, t)))
+
+        layers = list(reversed(layers))
+
+        self.layers = layers
+        self.seq = nn.Sequential(*layers)
+
+        self.dim = torch.prod(torch.as_tensor([c, t]))
+    def forward(self, x):
+        # for l in self.layers:
+        #     x = l(x)
+        #     print(x.shape)
+        x = self.seq(x)
+        x = x[:, None, :, :]
+        return x
+
 class Encoder(nn.Module):
     def __init__(self, stack, latent_dim, condition_enc=False, condition_dim=0, classify=False, target_dim=0):
         super().__init__()
@@ -392,6 +466,14 @@ class VariationalAutoencoder(nn.Module):
 def conv2d_builder(data_dim, latent_dim, device, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True, condition_dec=False, condition_enc=False, condition_dim=0, classify=False, num_labels=0):
     encoder_stack = Conv2dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)
     decoder_stack = TransposedConv2dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)
+    encoder = Encoder(encoder_stack, latent_dim, condition_enc, condition_dim, classify, num_labels)
+    decoder = Decoder(decoder_stack, latent_dim, condition_dec, condition_dim)
+    vae = VariationalAutoencoder(encoder, decoder, latent_dim, device)
+    return vae
+
+def conv1d_builder(data_dim, latent_dim, device, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True, condition_dec=False, condition_enc=False, condition_dim=0, classify=False, num_labels=0):
+    encoder_stack = Conv1dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)
+    decoder_stack = TransposedConv1dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)
     encoder = Encoder(encoder_stack, latent_dim, condition_enc, condition_dim, classify, num_labels)
     decoder = Decoder(decoder_stack, latent_dim, condition_dec, condition_dim)
     vae = VariationalAutoencoder(encoder, decoder, latent_dim, device)

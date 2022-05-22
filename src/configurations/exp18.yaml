@@ -1,0 +1,54 @@
+DATA_DOWNLOAD_PATH: "../data/sc/"
+DATA_PATH: "../data/sc/SpeechCommands/speech_commands_v0.02"
+PICKLE_PATH: "../simple_pickles/"
+AUDIO_PATH: "../audio/"
+EXPERIMENTS_PATH: "../experiments/"
+
+should_repickle: False
+should_train_model: True
+
+device: "cuda"
+
+log_interval: 100
+
+dummy_data_length: 
+
+epochs: 20
+batch_size: 128
+lr: 0.1
+lr_step_size: 1
+lr_gamma: 0.5
+weight_decay: 0.0001
+sqrt_for_loss : True
+
+model_type: "conv1d_vae"
+latent_dim: 32
+channels : [96,128,192, 256]
+strides : [2,2,2,2]
+kernel_sizes : [3,3,3,3]
+paddings : [1,1,1,1]
+# paddings: [0,0,0,0,0,0]
+
+
+condition_dec : True
+condition_enc : True
+classify : True
+
+nonlinearity : "tanh"
+batch_norm : True
+
+experiment_name: "exp18"
+
+n_mels: 64
+mel_scale: "htk"
+n_fft: 512
+hop_length: 256
+win_length: 512
+
+# n_mels: 81
+# mel_scale: "htk"
+# n_fft: 400
+# hop_length:
+# win_length:
+
+transform_type: "mel_spectrogram"
