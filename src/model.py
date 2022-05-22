@@ -369,7 +369,7 @@ class VariationalAutoencoder(nn.Module):
         kl = kl_divergence(z_mu, z_log_var)
 
         x_rec = self.decoder(z, condition)
-        return x_rec, kl, *clazz
+        return x_rec, kl, clazz[0] if len(clazz) == 1 else None
 
     def sample(self, n, condition=None):
         z_sample = self.N.sample((n, self.latent_dim))

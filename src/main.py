@@ -203,7 +203,7 @@ def classify(model, data_loader):
     return loss, acc
 
 if __name__ == "__main__":
-    experiments = ['exp14.yaml, "exp15.yaml']
+    experiments = ['exp14.yaml', "exp15.yaml", ]
     for experiment in experiments:
         print(experiment)
         configuration_path = 'configurations' + os.sep + experiment
