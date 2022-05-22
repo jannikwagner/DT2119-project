@@ -32,13 +32,12 @@ paddings : [[0,1],[0,1],[0,1],[1,0],[1,0],[1,0]]
 
 condition_dec : True
 condition_enc : True
-classify : True
+classify : False
 
 nonlinearity : "tanh"
 batch_norm : True
 
-
-experiment_name: "exp14"
+experiment_name: "exp15"
 
 n_mels: 64
 mel_scale: "htk"

@@ -30,7 +30,7 @@ class SubsetSC(SPEECHCOMMANDS):
             excludes = load_list("validation_list.txt") + load_list("testing_list.txt")
             excludes = set(excludes)
             self._walker = [w for w in self._walker if w not in excludes]
-            self._walker = self._walker[:num]
+        self._walker = self._walker[:num]
 
 
 
@@ -40,14 +40,16 @@ class DataManager:  # needs modularization!
         # Create training and testing split of the data. We do not use validation.
         self.train_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "training", config.dummy_data_length)
         self.print_if_print_info("trainset length", len(self.train_set))
-        self.test_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "testing")
-        self.print_if_print_info("SubsetSC loaded")
+        self.test_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "testing", config.dummy_data_length)
+        self.print_if_print_info("testset length", len(self.test_set))
+        self.val_set = SubsetSC(config.DATA_DOWNLOAD_PATH, "validation", config.dummy_data_length)
+        self.print_if_print_info("valset length", len(self.val_set))
 
         waveform, sample_rate, label, speaker_id, utterance_number = self.train_set[0]
         self.sample_rate = sample_rate
 
         if config.should_repickle:
-            self.labels = sorted(list(set(datapoint[2] for datapoint in self.train_set)))
+            self.labels = sorted(list(set(datapoint[2] for datapoint in self.train_set + self.test_set + self.val_set)))
             with open(config.LABELS_PATH, 'wb') as handle:
                 pickle.dump(self.labels, handle, protocol=pickle.HIGHEST_PROTOCOL)
             self.print_if_print_info("labels saved")  
@@ -67,9 +69,9 @@ class DataManager:  # needs modularization!
             speakers = sorted([speaker for speaker in speakers])
             speaker_dic = {speaker: i for i, speaker in enumerate(speakers)}
             return speaker_dic
-
+        
         if config.should_repickle: 
-            self.speaker_dic = make_speaker_dic(self.train_set)
+            self.speaker_dic = make_speaker_dic(self.train_set + self.test_set + self.val_set)
             with open(config.SPEAKER_DICT_PATH, 'wb') as handle:
                 pickle.dump(self.speaker_dic, handle, protocol=pickle.HIGHEST_PROTOCOL)
             self.print_if_print_info("speaker_dic saved")  
@@ -169,10 +171,10 @@ class DataManager:  # needs modularization!
             return tensors, labels, speaker_ids
 
         if config.device == "cuda":
-            num_workers = 1
+            num_workers = 4
             pin_memory = True
         else:
-            num_workers = 0
+            num_workers = 2
             pin_memory = False
 
         self.train_loader = torch.utils.data.DataLoader(
@@ -185,6 +187,15 @@ class DataManager:  # needs modularization!
         )
         self.test_loader = torch.utils.data.DataLoader(
             self.test_set,
+            batch_size=config.batch_size,
+            shuffle=False,
+            drop_last=False,
+            collate_fn=collate_fn,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+        )
+        self.val_loader = torch.utils.data.DataLoader(
+            self.val_set,
             batch_size=config.batch_size,
             shuffle=False,
             drop_last=False,

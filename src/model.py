@@ -294,7 +294,7 @@ class Encoder(nn.Module):
         self.stack = stack
         dim = stack.dim
         self.condition_enc = condition_enc
-        self.classify = classify
+        self._classify = classify
 
         self.fc_z_mu = nn.Linear(dim+condition_dim*condition_enc, latent_dim)
         self.fc_z_log_var = nn.Linear(dim+condition_dim*condition_enc, latent_dim)
@@ -317,13 +317,13 @@ class Encoder(nn.Module):
         z_mu = self.fc_z_mu(x_cond)
         z_log_var = F.tanh(self.fc_z_log_var(x_cond))
         
-        if self.classify:
+        if self._classify:
             return z_mu, z_log_var, self.classifier(x)
 
         return z_mu, z_log_var
     
     def classify(self, x):
-        assert self.classify
+        assert self._classify
         x = self.stack(x)
         clazz = self.classifier(x)
         return clazz
@@ -385,6 +385,9 @@ class VariationalAutoencoder(nn.Module):
         self.N.loc = self.N.loc.to(old_device)
         self.N.scale = self.N.scale.to(old_device)
         return model
+    
+    def classify(self, x):
+        return self.encoder.classify(x)
         
 def conv2d_builder(data_dim, latent_dim, device, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True, condition_dec=False, condition_enc=False, condition_dim=0, classify=False, num_labels=0):
     encoder_stack = Conv2dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)

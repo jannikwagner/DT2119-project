@@ -1,3 +1,4 @@
+import random
 from turtle import backward
 from tqdm import tqdm
 import torchaudio
@@ -109,30 +110,32 @@ def train(model, optimizer, scheduler, criterion, config, transform, train_loade
         # test(model, epoch)
         scheduler.step()
         torch.save(model, config.TRAINED_MODEL_PATH)  # save every epoch in case of failure (TODO: should save he cpu version so that it can be loaded from cpu)
-    return total_rec_losses, total_kl_losses, total_clazz_losses
+
+        plot(total_rec_losses, total_kl_losses, total_clazz_losses, config)  
 
 # pass through model
 def reconstruct_audio_test(model, config, train_set, transform, inverse_transform):
-    waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
+    print("reconstruct test")
+    waveform, sample_rate, label, speaker_id, utterance_number = train_set[random.randint(0,100)]
     waveform = waveform.to(config.device)[None, ...]
     transform, inverse_transform = transform.to(config.device), inverse_transform.to(config.device)
     transformed = transform(waveform)
-    print("transformed")
-    print(transformed)
-    print(transformed.min(), transformed.max())
+    # print("transformed")
+    # print(transformed)
+    # print(transformed.min(), transformed.max())
     model = model.eval()
     label_one_hot = data_manager.label_to_one_hot(label)[None, ...]
     with torch.no_grad():
         rec_features, *_ = model(transformed, label_one_hot)
-    print("rec_features")
-    print(rec_features)
-    print(rec_features.min(), rec_features.max())
-    print("diff")
-    print(transformed - rec_features)
+    # print("rec_features")
+    # print(rec_features)
+    # print(rec_features.min(), rec_features.max())
+    # print("diff")
+    # print(transformed - rec_features)
     rec_wav = inverse_transform(rec_features)
-    print("rec_wav")
-    print(rec_wav.min(), rec_wav.max())
-    print(rec_wav.shape)
+    # print("rec_wav")
+    # print(rec_wav.min(), rec_wav.max())
+    # print(rec_wav.shape)
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "model_rec.wav"), rec_wav.to("cpu")[0], sample_rate)
     torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav.to("cpu")[0], sample_rate)
 
@@ -168,6 +171,7 @@ def plot(total_rec_losses, total_kl_losses, total_clazz_losses, config):
     plt.cla()
 
 def sample_test(model, config, data_manager, label="backward"):
+    print("sample")
     model = model.eval().to(config.device)
     label_one_hot = data_manager.label_to_one_hot(label)[None, :]
     with torch.no_grad():
@@ -176,8 +180,30 @@ def sample_test(model, config, data_manager, label="backward"):
     print(sample_wav.shape)
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "sample.wav"), sample_wav.to("cpu")[0], data_manager.sample_rate)
 
+def get_acc(clazz, label):
+    label = torch.argmax(label, dim=1)
+    clazz = torch.argmax(clazz, dim=1)
+    acc = torch.sum(clazz == label)/len(clazz)
+    return acc
+
+def classify(model, data_loader):
+    model.eval()
+    with torch.no_grad():
+        total_loss = 0
+        total_acc = 0
+        for batch_idx, (audio, label, speaker_id) in enumerate(data_loader):
+            features = data_manager.transform(audio)
+            clazz = model.classify(features)
+            loss = F.cross_entropy(clazz, label)
+            acc = get_acc(clazz, label)
+            # print("loss:", loss, "acc:", acc)
+            total_loss, total_acc = total_loss + loss, total_acc + acc
+
+    loss, acc = total_loss /(batch_idx+1), total_acc /(batch_idx+1)
+    return loss, acc
+
 if __name__ == "__main__":
-    experiments = ['exp14.yaml']
+    experiments = ['exp14.yaml, "exp15.yaml']
     for experiment in experiments:
         print(experiment)
         configuration_path = 'configurations' + os.sep + experiment
@@ -200,15 +226,23 @@ if __name__ == "__main__":
             optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.lr_step_size, gamma=config.lr_gamma)  # reduce the learning after 20 epochs by a factor of 10
             criterion = nn.MSELoss()
-            total_rec_losses, total_kl_losses, total_clazz_losses = train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
-            plot(total_rec_losses, total_kl_losses, total_clazz_losses, config)   
+            train(model, optimizer, scheduler, criterion, config, data_manager.transform, data_manager.train_loader)
         else:
             model = torch.load(config.TRAINED_MODEL_PATH, map_location=config.device)
-        print("trained model loaded")
+            print("trained model loaded")
 
         reconstruct_audio_test(model.to(config.device), config, data_manager.train_set, data_manager.transform, data_manager.inverse_transform)
 
         sample_test(model, config, data_manager)
+
+        if config.classify:
+            loss, acc = classify(model, data_manager.test_loader)
+            with open(os.path.join(config.EXPERIMENT_PATH, "test.txt"), "w") as f:
+                f.writelines([
+                    f"test classify loss: {loss}\n",
+                    f"test acc: {acc}"
+                ])
+
     
 
 
