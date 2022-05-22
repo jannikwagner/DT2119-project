@@ -39,10 +39,16 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         mel_spectrogram = transform(audio)  # batch_size, n_channels, n_mel, n_windows
         optimizer.zero_grad()
         
-        rec_mel_spectrogram, kl = model(mel_spectrogram, label)  # 
+        rec_mel_spectrogram, kl, *clazz = model(mel_spectrogram, label)  # 
 
+        classify_loss = 0
+        if config.classify:
+            clazz = clazz[0]
+            classify_loss = F.binary_cross_entropy(clazz, label)
         rec_loss = criterion(rec_mel_spectrogram, mel_spectrogram)
-        loss = rec_loss + kl
+
+        loss = rec_loss + kl + classify_loss
+
         loss.backward()
         optimizer.step()
 
@@ -50,8 +56,8 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         total_rec_loss += rec_loss.detach().cpu().numpy().sum()
         total_kl_loss += kl.detach().cpu().numpy().sum()
 
-        if (batch_idx+1) % config.log_interval == 0:  
-            print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.detach().cpu().numpy().sum()/batchsize:.5f}, kl: {kl.detach().cpu().numpy().sum()/batchsize:.5f}, time {time.time()-t:.5f}")
+        if (batch_idx) % config.log_interval == 0:  
+            print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.detach().cpu().numpy().sum()/batchsize:.5f}, kl: {kl.detach().cpu().numpy().sum()/batchsize:.5f}, classify_loss: {classify_loss:.5f}, time {time.time()-t:.5f}")
     return total_rec_loss/len(dataloader), total_kl_loss/len(dataloader)
 
 def number_of_correct(pred, target):
@@ -111,7 +117,7 @@ def reconstruct_audio_test(model, config, train_set, transform, inverse_transfor
     model = model.eval()
     label_one_hot = data_manager.label_to_one_hot(label)[None, ...]
     with torch.no_grad():
-        rec_features, _ = model(transformed, label_one_hot)
+        rec_features, *_ = model(transformed, label_one_hot)
     print("rec_features")
     print(rec_features)
     print(rec_features.min(), rec_features.max())
@@ -123,6 +129,26 @@ def reconstruct_audio_test(model, config, train_set, transform, inverse_transfor
     print(rec_wav.shape)
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "model_rec.wav"), rec_wav.to("cpu")[0], sample_rate)
     torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), rec_wav.to("cpu")[0], sample_rate)
+
+def reconstruct_normed_audio_test(config, train_set, transform, inverse_transform):
+    """I just tested whether it makes a difference if mel_spectrogram files are normalized: It does, don't normalize!
+
+    Args:
+        config (_type_): _description_
+        train_set (_type_): _description_
+        transform (_type_): _description_
+        inverse_transform (_type_): _description_
+    """
+    waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
+    waveform = waveform.to(config.device)[None, ...]
+    transform, inverse_transform = transform.to(config.device), inverse_transform.to(config.device)
+    transformed = transform(waveform)
+    rec_wav = inverse_transform(transformed)
+    transformed_norm = transformed / transformed.max()
+    rec_norm_wav = inverse_transform(transformed_norm)
+    torchaudio.save(os.path.join(config.AUDIO_PATH, "rec.wav"), rec_wav.to("cpu")[0], sample_rate)
+    torchaudio.save(os.path.join(config.AUDIO_PATH, "rec_norm.wav"), rec_norm_wav.to("cpu")[0], sample_rate)
+    torchaudio.save(os.path.join(config.AUDIO_PATH, "original.wav"), waveform.to("cpu")[0], sample_rate)
 
 def plot(rec_loss_over_epochs, kl_loss_over_epochs, config):
     n = len(rec_loss_over_epochs)
@@ -144,7 +170,7 @@ def sample_test(model, config, data_manager, label="backward"):
     torchaudio.save(os.path.join(config.EXPERIMENT_PATH, "sample.wav"), sample_wav.to("cpu")[0], data_manager.sample_rate)
 
 if __name__ == "__main__":
-    experiments = ['exp11.yaml']
+    experiments = ['exp14.yaml']
     for experiment in experiments:
         print(experiment)
         configuration_path = 'configurations' + os.sep + experiment
@@ -158,8 +184,9 @@ if __name__ == "__main__":
 
         # The transform needs to live on the same device as the model and the data.
         data_manager = DataManager(config)
+
         if config.should_train_model:
-            model = get_model(config, data_manager.data_dim, data_manager.condition_dim)
+            model = get_model(config, data_manager.data_dim, data_manager.condition_dim, data_manager.n_labels)
             print(model)
             optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.lr_step_size, gamma=config.lr_gamma)  # reduce the learning after 20 epochs by a factor of 10

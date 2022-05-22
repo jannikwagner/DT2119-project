@@ -8,7 +8,7 @@ import torchaudio
 Probably there should be different files for different models.
 """
 
-def get_model(config, data_dim, condition_dim):
+def get_model(config, data_dim, condition_dim, num_labels):
     if config.model_type == "simple_vae":
         model = SimpleVariationalAutoencoder(data_dim, config.latent_dim, config.device)
     
@@ -16,7 +16,7 @@ def get_model(config, data_dim, condition_dim):
         model = LinearVariationalAutoencoder(data_dim, config.latent_dim, config.hidden_dims, config.device)
 
     elif config.model_type == "conv2d_vae":
-        model = conv2d_builder(data_dim, config.latent_dim, config.device, config.channels, config.strides, config.kernel_sizes, config.paddings, config.nonlinearity, config.batch_norm, config.condition_dec, config.condition_enc, condition_dim)
+        model = conv2d_builder(data_dim, config.latent_dim, config.device, config.channels, config.strides, config.kernel_sizes, config.paddings, config.nonlinearity, config.batch_norm, config.condition_dec, config.condition_enc, condition_dim, config.classify, num_labels)
     return model.to(config.device)
 
 
@@ -289,14 +289,20 @@ class TransposedConv2dStack(nn.Module):
         return x
 
 class Encoder(nn.Module):
-    def __init__(self, stack, latent_dim, condition_enc=False, condition_dim=0):
+    def __init__(self, stack, latent_dim, condition_enc=False, condition_dim=0, classify=False, target_dim=0):
         super().__init__()
         self.stack = stack
         dim = stack.dim
         self.condition_enc = condition_enc
+        self.classify = classify
 
         self.fc_z_mu = nn.Linear(dim+condition_dim*condition_enc, latent_dim)
         self.fc_z_log_var = nn.Linear(dim+condition_dim*condition_enc, latent_dim)
+        if classify:
+            self.classifier = nn.Sequential(
+                nn.Linear(dim, target_dim),
+                nn.Softmax()
+            )
     
     def forward(self, x, condition=None):
         #x = torch.flatten(x, start_dim=1)
@@ -305,12 +311,22 @@ class Encoder(nn.Module):
         
         if self.condition_enc and condition is not None:
             # print("enc", x.shape)
-            x = torch.concat([x, condition], 1)
+            x_cond = torch.concat([x, condition], 1)
             # print("enc", x.shape)
 
-        z_mu = self.fc_z_mu(x)
-        z_log_var = F.tanh(self.fc_z_log_var(x))
+        z_mu = self.fc_z_mu(x_cond)
+        z_log_var = F.tanh(self.fc_z_log_var(x_cond))
+        
+        if self.classify:
+            return z_mu, z_log_var, self.classifier(x)
+
         return z_mu, z_log_var
+    
+    def classify(self, x):
+        assert self.classify
+        x = self.stack(x)
+        clazz = self.classifier(x)
+        return clazz
 
 
 class Decoder(nn.Module):
@@ -344,14 +360,14 @@ class VariationalAutoencoder(nn.Module):
         self.N.scale = self.N.scale.to(device)
 
     def forward(self, x, condition=None):
-        z_mu, z_log_var = self.encoder(x, condition)
+        z_mu, z_log_var, *clazz = self.encoder(x, condition)
 
         z_std = torch.exp(z_log_var/2)
         z = z_mu + z_std*self.N.sample(z_mu.shape)
         kl = kl_divergence(z_mu, z_log_var)
 
         x_rec = self.decoder(z, condition)
-        return x_rec, kl
+        return x_rec, kl, *clazz
 
     def sample(self, n, condition=None):
         z_sample = self.N.sample((n, self.latent_dim))
@@ -368,10 +384,10 @@ class VariationalAutoencoder(nn.Module):
         self.N.scale = self.N.scale.to(old_device)
         return model
         
-def conv2d_builder(data_dim, latent_dim, device, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True, condition_dec=False, condition_enc=False, condition_dim=0):
+def conv2d_builder(data_dim, latent_dim, device, channels, strides=None, kernel_sizes=None, paddings=None, nonlinearity="relu", batch_norm=True, condition_dec=False, condition_enc=False, condition_dim=0, classify=False, num_labels=0):
     encoder_stack = Conv2dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)
     decoder_stack = TransposedConv2dStack(data_dim, channels, strides, kernel_sizes, paddings, nonlinearity, batch_norm)
-    encoder = Encoder(encoder_stack, latent_dim, condition_enc, condition_dim)
+    encoder = Encoder(encoder_stack, latent_dim, condition_enc, condition_dim, classify, num_labels)
     decoder = Decoder(decoder_stack, latent_dim, condition_dec, condition_dim)
     vae = VariationalAutoencoder(encoder, decoder, latent_dim, device)
     return vae
