@@ -37,6 +37,10 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         # print(label.shape, speaker_id.shape)
         # print(label, speaker_id)
         mel_spectrogram = transform(audio)  # batch_size, n_channels, n_mel, n_windows
+        if False:  # train on log mel_spec
+            eps = 10**-10
+            mel_spectrogram = mel_spectrogram + eps
+            mel_spectrogram = mel_spectrogram.log()
         optimizer.zero_grad()
         
         rec_mel_spectrogram, kl, *clazz = model(mel_spectrogram, label)  # 
@@ -45,6 +49,17 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         if config.classify:
             clazz = clazz[0]
             classify_loss = F.binary_cross_entropy(clazz, label)
+        if False:  # normalize before loss
+            max_mel_spec = mel_spectrogram.max().sqrt()
+            mel_spectrogram = mel_spectrogram / max_mel_spec
+            rec_mel_spectrogram = rec_mel_spectrogram / max_mel_spec
+        if False:  # log before loss
+            eps = 10**-5
+            mel_spectrogram = (mel_spectrogram + eps).log()
+            rec_mel_spectrogram = (rec_mel_spectrogram + eps).log()
+        if config.sqrt_for_loss:  # sqrt before loss
+            mel_spectrogram = (mel_spectrogram).sqrt()
+            rec_mel_spectrogram = (rec_mel_spectrogram).sqrt()
         rec_loss = criterion(rec_mel_spectrogram, mel_spectrogram)
 
         loss = rec_loss + kl + classify_loss

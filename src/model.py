@@ -337,6 +337,7 @@ class Decoder(nn.Module):
         self.condition_dec = condition_dec
 
         self.stack = stack
+        self.relu = nn.ReLU()
         
     def forward(self, z, condition=None):
         if self.condition_dec and condition is not None:
@@ -346,6 +347,7 @@ class Decoder(nn.Module):
 
         z = self.fc(z)
         x_rec = self.stack(z)
+        x_rec = self.relu(x_rec)
         return x_rec
 
 class VariationalAutoencoder(nn.Module):
