@@ -159,12 +159,22 @@ def reconstruct_normed_audio_test(config, train_set, transform, inverse_transfor
 def plot(total_rec_losses, total_kl_losses, total_clazz_losses, config):
     n = len(total_rec_losses)
     plt.plot(range(n), total_rec_losses, label="rec_loss")
+    plt.xlabel("updates")
+    plt.ylabel("loss")
+    plt.legend()
+    plt.savefig(os.path.join(config.EXPERIMENT_PATH, "rec_loss.png"))
+    plt.cla()
     plt.plot(range(n), total_kl_losses, label="kl_loss")
+    plt.xlabel("updates")
+    plt.ylabel("loss")
+    plt.legend()
+    plt.savefig(os.path.join(config.EXPERIMENT_PATH, "kl_loss.png"))
+    plt.cla()
     plt.plot(range(n), total_clazz_losses, label="clazz_loss")
     plt.xlabel("updates")
     plt.ylabel("loss")
     plt.legend()
-    plt.savefig(os.path.join(config.EXPERIMENT_PATH, "loss.png"))
+    plt.savefig(os.path.join(config.EXPERIMENT_PATH, "clazz_loss.png"))
     plt.cla()
 
 def sample_test(model, config, data_manager):
