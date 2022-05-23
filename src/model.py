@@ -387,6 +387,8 @@ class Encoder(nn.Module):
             # print("enc", x.shape)
             x_cond = torch.concat([x, condition], 1)
             # print("enc", x.shape)
+        else:
+            x_cond = x
 
         z_mu = self.fc_z_mu(x_cond)
         z_log_var = F.tanh(self.fc_z_log_var(x_cond))
