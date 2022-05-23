@@ -59,6 +59,7 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         clazz_losses.append(classify_loss.item())
 
         if (batch_idx) % config.log_interval == 0:  
+            # print(features, rec_features, features-rec_features)
             print(f"--> train step: {batch_idx}, rec_loss: {rec_loss.item():.5f}, kl: {kl.item():.5f}, classify_loss: {classify_loss.item():.5f}, time {time.time()-t:.5f}")
     return rec_losses, kl_losses, clazz_losses
 
@@ -212,12 +213,11 @@ def classify(model, data_loader):
     return loss, acc
 
 if __name__ == "__main__":
-    experiments = ['exp26.yaml','exp27.yaml']
+    experiments = ['exp26.yaml','exp28.yaml','exp29.yaml','exp27.yaml']
     for experiment in experiments:
         print(experiment)
         configuration_path = 'configurations' + os.sep + experiment
         config = Config(configuration_path)
-
         print("config", config.config)
         print("device:", config.device)
         os.makedirs(config.DATA_DOWNLOAD_PATH, exist_ok=True)

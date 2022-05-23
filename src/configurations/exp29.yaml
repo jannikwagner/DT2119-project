@@ -5,7 +5,7 @@ AUDIO_PATH: "../audio/"
 EXPERIMENTS_PATH: "../experiments/"
 
 should_repickle: False
-should_train_model: False
+should_train_model: True
 continue_training: False
 
 device: "cuda"
@@ -23,12 +23,12 @@ weight_decay: 0.0001
 log_input: False
 
 model_type: "conv1d_vae"
-latent_dim: 512
-channels : [4,8,16,32,64]
+latent_dim: 1024
+channels : [128,256,256,512,1024]
 # channels : [4,8,16, 32]
-strides : [2,4,4,4,2]
-kernel_sizes : [5,7,7,7,5]
-paddings : [2,3,3,3,2]
+strides : [1,2,2,2,2]
+kernel_sizes : [3,5,7,7,5]
+paddings : [1,2,3,3,2]
 # paddings: [0,0,0,0,0,0]
 
 
@@ -39,13 +39,14 @@ classify : False
 nonlinearity : "relu"
 batch_norm : True
 
-experiment_name: "exp26"
+experiment_name: "exp29"
 
 n_mels: 64
 mel_scale: "htk"
 n_fft: 512
 hop_length: 256
 win_length: 512
+power: 1
 
 # n_mels: 81
 # mel_scale: "htk"
@@ -53,4 +54,4 @@ win_length: 512
 # hop_length:
 # win_length:
 
-transform_type: 
+transform_type: "mel_spectrogram"

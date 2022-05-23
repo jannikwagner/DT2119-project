@@ -70,6 +70,7 @@ class Config:
     hop_length = None
     win_length = None
     n_stft = n_fft // 2 + 1
+    power=2
 
     transform_type = "mel_spectrogram"  # or "spectrogram"
 
