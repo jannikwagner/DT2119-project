@@ -5,7 +5,7 @@ AUDIO_PATH: "../audio/"
 EXPERIMENTS_PATH: "../experiments/"
 
 should_repickle: False
-should_train_model: True
+should_train_model: False
 
 device: "cuda"
 
@@ -38,7 +38,7 @@ classify : False
 nonlinearity : "tanh"
 batch_norm : True
 
-experiment_name: "exp24"
+experiment_name: "exp25"
 
 n_mels: 64
 mel_scale: "htk"
