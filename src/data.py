@@ -7,6 +7,7 @@ from torchaudio.datasets import SPEECHCOMMANDS
 import torch.nn as nn
 
 from configuration import Config
+from model import Lambda
 
 
 
@@ -31,7 +32,6 @@ class SubsetSC(SPEECHCOMMANDS):
             excludes = set(excludes)
             self._walker = [w for w in self._walker if w not in excludes]
         self._walker = self._walker[:num]
-
 
 
 class DataManager:  # needs modularization!
@@ -102,6 +102,12 @@ class DataManager:  # needs modularization!
         elif config.transform_type == "mel_spectrogram":
             self.transform = self.transform_MelSpectrogram
             self.inverse_transform = nn.Sequential(self.transform_InverseMelScale, self.transform_GriffinLim)
+        elif config.transform_type is None:
+            self.transform = Lambda(lambda x: x[:, None])
+            self.inverse_transform = Lambda(lambda x: x[:, 0])
+        if config.log_input:
+            self.transform = nn.Sequential(self.transform, Lambda(lambda x: torch.log(x+config.eps)))
+            self.inverse_transform = nn.Sequential(Lambda(lambda x: torch.exp(x) - config.eps), self.inverse_transform)
         def tests(train_set):
             waveform, sample_rate, label, speaker_id, utterance_number = train_set[0]
             self.print_if_print_info(waveform, sample_rate, label, speaker_id, utterance_number)

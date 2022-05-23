@@ -38,19 +38,16 @@ def train_one_epoch(model, dataloader, optimizer, transform, config, criterion):
         speaker_id = speaker_id.to(config.device)
         # print(label.shape, speaker_id.shape)
         # print(label, speaker_id)
-        mel_spectrogram = transform(audio)  # batch_size, n_channels, n_mel, n_windows
+        features = transform(audio)  # batch_size, n_channels, n_mel, n_windows
         optimizer.zero_grad()
         
-        rec_mel_spectrogram, kl, *clazz = model(mel_spectrogram, label)  # 
+        rec_features, kl, *clazz = model(features, label)  # 
 
         classify_loss = torch.as_tensor(0)
         if config.classify:
             clazz = clazz[0]
             classify_loss = F.binary_cross_entropy(clazz, label)
-        if config.sqrt_for_loss:  # sqrt before loss
-            mel_spectrogram = (mel_spectrogram).sqrt()
-            rec_mel_spectrogram = (rec_mel_spectrogram).sqrt()
-        rec_loss = criterion(rec_mel_spectrogram, mel_spectrogram)
+        rec_loss = criterion(rec_features, features)
 
         loss = rec_loss + kl + classify_loss
 
@@ -205,7 +202,7 @@ def classify(model, data_loader):
     return loss, acc
 
 if __name__ == "__main__":
-    experiments = ['exp22.yaml', "exp23.yaml"]
+    experiments = ['exp24.yaml', 'exp25.yaml']
     for experiment in experiments:
         print(experiment)
         configuration_path = 'configurations' + os.sep + experiment

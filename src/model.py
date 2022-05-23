@@ -1,4 +1,3 @@
-from pickletools import StackObject
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -48,6 +47,13 @@ def kl_divergence(z_mu, z_log_var):
     z_var = torch.exp(z_log_var)
     kl = torch.mean(-0.5 * torch.sum(1 + z_log_var - z_mu ** 2 - z_var, dim = 1), dim = 0)
     return kl
+
+class Lambda(nn.Module):
+    def __init__(self, f):
+        super().__init__()
+        self.f = f
+    def forward(self, x):
+        return self.f(x)
 
 class SimpleVariationalEncoder(nn.Module):
     def __init__(self, data_dim, latent_dim, device):
@@ -413,7 +419,6 @@ class Decoder(nn.Module):
         self.condition_dec = condition_dec
 
         self.stack = stack
-        self.relu = nn.ReLU()
         
     def forward(self, z, condition=None):
         if self.condition_dec and condition is not None:
@@ -423,7 +428,6 @@ class Decoder(nn.Module):
 
         z = self.fc(z)
         x_rec = self.stack(z)
-        x_rec = self.relu(x_rec)
         return x_rec
 
 class VariationalAutoencoder(nn.Module):
