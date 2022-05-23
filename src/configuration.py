@@ -20,6 +20,7 @@ class Config:
 
     should_repickle = False
     should_train_model = True
+    continue_training = False
 
     device = "cuda"
 

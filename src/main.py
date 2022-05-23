@@ -218,7 +218,10 @@ if __name__ == "__main__":
         data_manager = DataManager(config)
 
         if config.should_train_model:
-            model = get_model(config, data_manager.data_dim, data_manager.condition_dim, data_manager.n_labels)
+            if config.continue_training:
+                model = torch.load(config.TRAINED_MODEL_PATH, map_location=config.device)
+            else:
+                model = get_model(config, data_manager.data_dim, data_manager.condition_dim, data_manager.n_labels)
             pytorch_total_params = sum(p.numel() for p in model.parameters())
             print(model)
             print("params:", pytorch_total_params)
